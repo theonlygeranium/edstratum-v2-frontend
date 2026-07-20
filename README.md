@@ -20,7 +20,7 @@ npm install
 npm run dev
 ```
 
-Leaving `VITE_STRATUM_API_URL` unset runs the STRATUM chat against its local demo stream, which is safest for UI work because it cannot send escalation emails. To test against a backend from localhost, use a local backend origin that allows your dev server in CORS.
+Leaving `VITE_STRATUM_API_URL` unset runs the STRATUM chat against its local demo stream on localhost and Cloudflare preview branches, which is safest for UI work because it cannot send escalation emails. On `edstratumlabs.ai` and `www.edstratumlabs.ai`, the source includes a production-host fallback to the public Railway backend so the live site keeps real STRATUM responses even if Cloudflare Pages builds without the env var.
 
 ## Production Build
 
@@ -52,7 +52,7 @@ chmod +x deploy.sh
 - **Lazy loading**: All below-fold sections are `React.lazy` + `Suspense` — only `Navbar` and `Hero` are in the critical path.
 - **Motion constraint**: `LazyMotion strict` is set at the app root. Only `m.*` components (from `motion/react-m`) are permitted inside the tree. Bare `motion.div` etc. will throw at runtime.
 - **Design tokens**: All color, typography, and spacing tokens are defined in `src/index.css` under `@theme {}`. No `tailwind.config.js` exists.
-- **STRATUM chat**: The floating intake advisor lives in `src/stratum/`. It uses `VITE_STRATUM_API_URL` to stream `/api/chat` SSE events from Railway. If the URL is omitted, it falls back to the local demo stream and does not send escalation emails.
+- **STRATUM chat**: The floating intake advisor lives in `src/stratum/`. It uses `VITE_STRATUM_API_URL` to stream `/api/chat` SSE events from Railway. If the URL is omitted outside the production hostnames, it falls back to the local demo stream and does not send escalation emails.
 - **Escalation discretion**: Client-facing copy should refer to the `Founding leadership team` until the backend confirms that a notification has been sent. Do not add personal names or scheduling links in the frontend unless they are explicitly provisioned and approved.
 - **Deployment note**: This repo is now the frontend source of truth. The previous Cloudflare Pages deployment was a direct-upload artifact-only deploy (no Git integration). Connect this repo to Cloudflare Pages via the dashboard or continue using `deploy.sh` for direct uploads.
 

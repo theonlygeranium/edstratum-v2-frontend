@@ -34,7 +34,8 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Do not trigger live escalation flows during QA unless notifications are explicitly suppressed or the user asks for an email test.
 - Cloudflare Pages is connected to the private GitHub frontend repo.
 - Pushes to `main` automatically deploy production; pushes to feature branches create preview deployments.
-- Production has `VITE_STRATUM_API_URL` configured. Preview env vars were last verified as unset, so branch previews may use mock chat unless the backend URL is added to preview settings.
+- The frontend has a production-host fallback to `https://stratum-backend-production-a340.up.railway.app` if `VITE_STRATUM_API_URL` is missing on `edstratumlabs.ai` or `www.edstratumlabs.ai`.
+- Preview env vars were last verified as unset, so branch previews use mock chat unless the backend URL is added to preview settings.
 - CI posts commit status context `CI / build-and-test`; configure branch protection to require it before merges to `main`.
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 
@@ -48,6 +49,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Branch `feat/escalation-email` adds escalation delivery parsing and user-visible success/failure system confirmations after backend handoff events.
 - Local branch QA passed on 2026-07-20: `npm run lint`, `npm run build`, and `npm test -- --reporter=list` (`42 passed`).
 - Production live escalation UI should not be clicked until backend suppression is verified on the deployed service or the user explicitly requests an email test.
+- Follow-up fix `fix/production-backend-fallback` restores live Railway connectivity when Cloudflare Pages production builds without `VITE_STRATUM_API_URL`; localhost and branch previews remain mock-mode by default.
 
 ## Recommended Next Steps
 

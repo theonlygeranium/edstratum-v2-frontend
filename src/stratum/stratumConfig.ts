@@ -1,6 +1,17 @@
 import type { IntakeQuestion, ProcessingPhase } from './stratumTypes'
 
-const rawApiUrl = import.meta.env.VITE_STRATUM_API_URL?.trim() ?? ''
+const PRODUCTION_BACKEND_URL = 'https://stratum-backend-production-a340.up.railway.app'
+const PRODUCTION_HOSTS = new Set(['edstratumlabs.ai', 'www.edstratumlabs.ai'])
+
+function productionBackendFallback() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return PRODUCTION_HOSTS.has(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''
+}
+
+const rawApiUrl = import.meta.env.VITE_STRATUM_API_URL?.trim() || productionBackendFallback()
 
 export const STRATUM_API_URL = rawApiUrl.replace(/\/+$/, '')
 export const STRATUM_BACKEND_ENABLED = STRATUM_API_URL.length > 0
