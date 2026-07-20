@@ -5,13 +5,13 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production code commit verified: `2f95db5`
+- Latest frontend production code commit verified: `3372b43`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-Bg_rGm5t.js`
-- Current STRATUM chat asset: `/assets/StratumChat-CXnpkHWz.js`
+- Current production entry asset: `/assets/index-CAfNfkao.js`
+- Current STRATUM chat asset: `/assets/StratumChat-9GA-qGlc.js`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
@@ -28,6 +28,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Branch and production QA for RAG citations passed: local `npm run lint`, `npm run build`, `npm test -- --reporter=list` (`36 passed`), GitHub status `CI / build-and-test`, Cloudflare Pages production check, and live rendered smoke on `https://edstratumlabs.ai`.
 - Feature 2 escalation delivery UI is deployed. Local, branch, and production CI passed with `42` Playwright tests; live backend suppression endpoints passed; live rendered QA verified a real non-escalation backend chat and intercepted escalation success/failure confirmations without sending email.
 - Feature 3 Cloudflare Pages Functions middleware is deployed. Local, branch, and production CI passed with `54` Playwright tests; live `/api/config` and `/api/health` returned HTTP 200 with cache headers from Cloudflare Pages Functions.
+- Feature 4 sentiment escalation UI is deployed. Local and hosted CI passed with `64` Playwright tests; production rendered smoke intercepted `/api/chat` and confirmed urgency sends `escalationTrigger: "sentiment"` plus `sentimentSignal: "urgency"` while rendering the leadership handoff UI without sending email.
 
 ## Notes For Future Agents
 
@@ -59,6 +60,13 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Local, preview, and production QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, `npm test -- --reporter=list` (`54 passed`), `wrangler pages dev dist --port 8788` smoke for `/api/config` and `/api/health`, Cloudflare preview Functions smoke, and production Functions smoke.
 - Wrangler is not authenticated in this shell, so KV namespace creation and dashboard binding remain pending: `STRATUM_CONFIG` and `RATE_LIMIT`.
 - Until KV is bound, `/api/config` returns safe default runtime flags and `_middleware.ts` skips rate limiting.
+
+## Completed Feature 4
+
+- Enhancement spec Feature 4 is deployed: frontend sentiment detection, frustration handoff CTA, urgency auto-handoff, 10-minute cooldown after escalation events, mock sentiment test mode, and `tests/sentiment.spec.ts`.
+- Frontend commit `3372b43` is deployed on Cloudflare Pages production with chat asset `/assets/StratumChat-9GA-qGlc.js`.
+- Local QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npm test -- tests/sentiment.spec.ts --reporter=list` (`10 passed`), and `npm test -- --reporter=list` (`64 passed`).
+- Hosted branch and main CI passed on 2026-07-20 with `64 passed`; production rendered smoke confirmed urgency auto-handoff UI and captured the safe sentiment payload via intercepted SSE only, so no live handoff email was sent.
 
 ## Recommended Next Steps
 
