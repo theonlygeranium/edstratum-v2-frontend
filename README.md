@@ -34,6 +34,7 @@ VITE_STRATUM_API_URL=https://stratum-backend-production-a340.up.railway.app npm 
 
 ```bash
 npm run qa:live
+EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live
 ```
 
 The live smoke checks production without sending handoff email or generating

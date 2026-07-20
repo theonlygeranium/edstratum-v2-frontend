@@ -4,6 +4,7 @@ const DEFAULT_BACKEND_URL =
 
 const frontendUrl = normalizeUrl(process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL)
 const expected = {
+  manifestCommit: process.env.EXPECTED_MANIFEST_COMMIT || '',
   ragEnabled: readBool('EXPECTED_RAG_ENABLED', true),
   voiceEnabled: readBool('EXPECTED_VOICE_ENABLED', false),
   persistenceEnabled: readBool('EXPECTED_PERSISTENCE_ENABLED', false),
@@ -55,6 +56,7 @@ async function fetchWithTimeout(pathOrUrl, init = {}) {
       signal: controller.signal,
       headers: {
         accept: 'application/json',
+        'cache-control': 'no-cache',
         ...(init.headers || {}),
       },
     })
@@ -106,11 +108,20 @@ function forbiddenCopyFailures(text) {
 async function main() {
   console.log(`STRATUM live smoke: ${frontendUrl}`)
 
-  const manifestResult = await readJson('/build-manifest.json')
+  const manifestResult = await readJson(`/build-manifest.json?live-smoke=${Date.now()}`)
   const manifest = manifestResult.body
   expect(manifestResult.response.status === 200, 'manifest returns HTTP 200')
   expect(manifest.schemaVersion === 1, 'manifest schemaVersion is 1')
   expect(Boolean(manifest.commitShortSha), 'manifest includes commitShortSha')
+  if (expected.manifestCommit) {
+    expect(
+      manifest.commitSha === expected.manifestCommit ||
+        manifest.commitShortSha === expected.manifestCommit ||
+        manifest.commitSha?.startsWith(expected.manifestCommit),
+      'manifest commit matches expected',
+      manifest.commitShortSha || manifest.commitSha || 'missing',
+    )
+  }
   expect(
     /\bmax-age=60\b/.test(manifestResult.response.headers.get('cache-control') || ''),
     'manifest has short cache window',
