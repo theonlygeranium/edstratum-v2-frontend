@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production source/tooling commit verified locally and live: `b51a623`
+- Latest frontend production app code/tooling commit verified locally and live: `b51a623`
 - Latest verified app code-bearing asset commit: `b51a623`; it refreshes the entry/chat/service bundle hashes after the Pages fallback fix and keeps the seven-question STRATUM intake contract active in live runtime config.
 - GitHub Actions action-migration commit verified: `d01ce68`; frontend CI app-runtime migration commit verified: `f2c969b`; CI Playwright server-ownership fix commit `84e01ce` is already contained in current `main`; Wrangler pin commit `76b97ba`, live-smoke command commit `bb8f3b4`, rendered live-smoke command commit `52cdf47`, asset-smoke hardening commit `7eb42dd`, Pages fallback fix commit `b341b07`, and asset hash refresh commit `b51a623` are deployed, but hosted CI proof is pending because GitHub Actions run `29748630950` for commit `b51a623` failed before starting any steps due to an account billing/spending-limit blocker.
 - Cloudflare Pages project: `edstratumlabs`
@@ -21,7 +21,7 @@ Date: 2026-07-20
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
-Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, privacy-safe analytics source readiness, GitHub Actions Node 24 action/app runtime, pinned Wrangler source tooling, repeatable production live-smoke QA, rendered production smoke QA, seven-question intake runtime config, explicit asset MIME smoke coverage, Cloudflare Pages missing-asset fallback hardening, and production rendering are healthy through deployed source/tooling commit `b51a623`. Hosted CI proof for `b51a623` is blocked by a GitHub account billing/spending-limit failure, and the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence/analytics activation remain pending.
+Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, privacy-safe analytics source readiness, GitHub Actions Node 24 action/app runtime, pinned Wrangler source tooling, repeatable production live-smoke QA, rendered production smoke QA, seven-question intake runtime config, explicit asset MIME smoke coverage, Cloudflare Pages missing-asset fallback hardening, and production rendering are healthy through deployed app code/tooling commit `b51a623`. Hosted CI proof for `b51a623` is blocked by a GitHub account billing/spending-limit failure, and the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence/analytics activation remain pending.
 
 ## QA Completed
 
