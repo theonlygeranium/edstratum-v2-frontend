@@ -239,6 +239,22 @@ async function runDesktopFlow(browser, config) {
   })
   const page = await context.newPage()
   const diagnostics = attachDiagnostics(page)
+  const sameOriginChatRequests = []
+  const directBackendChatRequests = []
+
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') {
+      return
+    }
+
+    const url = request.url()
+    if (url === `${frontendUrl}/api/chat`) {
+      sameOriginChatRequests.push(url)
+    }
+    if (url.includes('stratum-backend-production-a340.up.railway.app/api/chat')) {
+      directBackendChatRequests.push(url)
+    }
+  })
 
   try {
     const { trigger } = await checkPageShell(page, 'desktop', diagnostics)
@@ -286,6 +302,16 @@ async function runDesktopFlow(browser, config) {
     assertCheck(
       !(await dialog.getByLabel(/STRATUM is composing/i).isVisible().catch(() => false)),
       'desktop live RAG stream reaches a completed rendered state',
+    )
+    assertCheck(
+      sameOriginChatRequests.length > 0,
+      'desktop chat request uses same-origin /api/chat',
+      sameOriginChatRequests[0] || 'none',
+    )
+    assertCheck(
+      directBackendChatRequests.length === 0,
+      'desktop chat does not call Railway directly',
+      directBackendChatRequests.join(', '),
     )
 
     await sourcesButton.click()
