@@ -5,18 +5,18 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production code commit verified: `17124c1`
+- Latest frontend production code commit verified: `e1ff6d6`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-q6iZ6B76.js`
-- Current STRATUM chat asset: `/assets/StratumChat-BporotpB.js`
+- Current production entry asset: `/assets/index-Ozo3qdmX.js`
+- Current STRATUM chat asset: `/assets/StratumChat-BwzZIuCC.js`
 - Current PDF snapshot assets: `/assets/stratumPDF-Bgc_chGe.js`, `/assets/pdf-vendor-B7fMFYQc.js`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
-Latest SOT gate status: frontend source, CI, and production rendering are healthy at commit `17124c1`, but the full build spec is not yet complete because live Cloudflare/Railway configuration remains pending.
+Latest SOT gate status: frontend source, CI, same-origin proxy routes, and production rendering are healthy at commit `e1ff6d6`, but the full build spec is not yet complete because live Cloudflare/Railway configuration remains pending.
 
 ## QA Completed
 
@@ -34,8 +34,10 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 - Feature 4 sentiment escalation UI is deployed. Local and hosted CI passed with `64` Playwright tests; production rendered smoke intercepted `/api/chat` and confirmed urgency sends `escalationTrigger: "sentiment"` plus `sentimentSignal: "urgency"` while rendering the leadership handoff UI without sending email.
 - Feature 5 D1 persistence scaffolding is deployed. Local, branch, and production CI passed with `84` Playwright tests; live `/api/config` remains `persistenceEnabled: false`, `/api/sessions` fails closed with `d1_not_configured`, and rendered live smoke verified chat works with no session endpoint calls while persistence is disabled.
 - Feature 6 voice/TTS scaffolding is deployed and runtime-gated off. Local, branch, and production CI passed with `98` Playwright tests; live `/api/config` returns `voiceEnabled: false`, the production chat asset contains the voice/TTS code, backend health reports `tts.provider: "elevenlabs"` with `tts.status: "unconfigured"`, and rendered live smoke verified no voice controls appear while disabled.
-- Feature 7 PDF snapshot download is deployed. Initial local, branch, and production CI passed with `110` Playwright tests; current production at `17124c1` passes `112` tests and still lazy-loads the PDF renderer chunks. Rendered live smoke intercepted `/api/chat` and verified the `Download Summary` control plus a generated PDF download without sending any live handoff email.
-- SOT QA gate commit `17124c1` is deployed on production. Main CI `29728690249` passed, local `npm run type-check`, real `npm run lint`, `npm run build`, `npx wrangler pages functions build`, and full Playwright suite passed with `112 passed`; rendered production smoke verified intercepted handoff UI, hidden voice controls while disabled, PDF download generation, and no console/page errors.
+- Feature 7 PDF snapshot download is deployed. Initial local, branch, and production CI passed with `110` Playwright tests; current production at `e1ff6d6` passes `120` tests and still lazy-loads the PDF renderer chunks. Rendered live smoke intercepted `/api/chat` and verified the `Download Summary` control plus a generated PDF download without sending any live handoff email.
+- SOT QA gate commit `17124c1` was previously deployed on production. Main CI `29728690249` passed, local `npm run type-check`, real `npm run lint`, `npm run build`, `npx wrangler pages functions build`, and full Playwright suite passed with `112 passed`; rendered production smoke verified intercepted handoff UI, hidden voice controls while disabled, PDF download generation, and no console/page errors.
+- Same-origin proxy commit `e1ff6d6` is deployed on production. Main CI `29729914138` passed with `120 passed`; local `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused proxy/voice tests (`44 passed`), full Playwright suite (`120 passed` with one worker after a high-parallelism runner blank-page retry), and rendered production smoke passed.
+- Live `https://edstratumlabs.ai/api/escalate` with `X-Stratum-QA: true` returned `200` and `status: "suppressed"`, live `/api/tts` returned backend validation `422` for an invalid payload, and live `/api/tts` returned `503 tts_not_configured` for a valid validation-only payload without invoking ElevenLabs.
 
 ## Notes For Future Agents
 
@@ -51,7 +53,7 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 - D1 persistence is source-ready but inactive until Cloudflare D1 binding `STRATUM_DB`, env var `SESSION_SECRET`, schema execution, and KV runtime flag `persistenceEnabled: true` are configured.
 - Voice/TTS is source-ready but inactive until Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, and runtime config `voiceEnabled: true` are configured.
 - PDF snapshot generation is client-side and lazy-loaded from `src/lib/stratumPDF.tsx`; there is no server round-trip or Node `fs`/`path`/`crypto` import in the client source.
-- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, and `/api/sessions`; `/api/escalate` and `/api/tts` are not implemented as same-origin Pages Functions and currently return HTTP 405 from `https://edstratumlabs.ai`.
+- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/sessions`, `/api/escalate`, and `/api/tts`. The TTS player now targets same-origin `/api/tts` when voice playback is enabled.
 
 ## Completed Feature 1
 
@@ -66,11 +68,12 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 
 ## Completed Feature 3
 
-- Enhancement spec Feature 3 is deployed: Cloudflare Pages Functions for `/api/health`, `/api/config`, and best-effort API rate limiting when KV bindings are available.
+- Enhancement spec Feature 3 is deployed: Cloudflare Pages Functions for `/api/health`, `/api/config`, `/api/escalate`, `/api/tts`, and best-effort API rate limiting when KV bindings are available.
 - Frontend commit `2f95db5` is deployed on Cloudflare Pages production.
 - Local, preview, and production QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, `npm test -- --reporter=list` (`54 passed`), `wrangler pages dev dist --port 8788` smoke for `/api/config` and `/api/health`, Cloudflare preview Functions smoke, and production Functions smoke.
 - Wrangler is not authenticated in this shell, so KV namespace creation and dashboard binding remain pending: `STRATUM_CONFIG` and `RATE_LIMIT`.
 - Until KV is bound, `/api/config` returns safe default runtime flags and `_middleware.ts` skips rate limiting.
+- Frontend commit `e1ff6d6` adds same-origin `/api/escalate` and `/api/tts` proxy Functions. Production QA passed on 2026-07-20 with QA-suppressed `/api/escalate` and validation-only `/api/tts` probes.
 
 ## Completed Feature 4
 
@@ -96,7 +99,7 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 ## Completed Feature 7
 
 - Enhancement spec Feature 7 is deployed in source and production: client-side `@react-pdf/renderer` session summary generation, `ChatPhase` completion/escalation gating, `Download Summary` UI with aria-label `Download session summary as PDF`, lazy PDF renderer chunking, and `tests/pdf-snapshot.spec.ts`.
-- Frontend commit `395d0b8` initially deployed the feature; current production commit `17124c1` serves chat asset `/assets/StratumChat-BporotpB.js` and PDF chunks `/assets/stratumPDF-Bgc_chGe.js` plus `/assets/pdf-vendor-B7fMFYQc.js`.
+- Frontend commit `395d0b8` initially deployed the feature; current production commit `e1ff6d6` serves chat asset `/assets/StratumChat-BwzZIuCC.js` and PDF chunks `/assets/stratumPDF-Bgc_chGe.js` plus `/assets/pdf-vendor-B7fMFYQc.js`.
 - Local QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, no client `fs`/`path`/`crypto` imports, focused PDF browser tests (`12 passed`), and full frontend suite (`110 passed`).
 - Hosted branch and main CI passed on 2026-07-20 with `110 passed`; production rendered smoke intercepted `/api/chat`, verified the download button after an escalation state, generated `edstratum-intake-...pdf`, and produced no console errors or live notification traffic.
 
@@ -106,7 +109,6 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 - Cloudflare KV rate limiting is not active in production. Live rapid `/api/config` probes did not return HTTP 429, and `_middleware.ts` skips enforcement until `RATE_LIMIT` is bound.
 - D1 persistence is not active in production. `/api/config` returns `persistenceEnabled: false`, and `/api/sessions/.../messages` returns `503` with `d1_not_configured`.
 - Voice/TTS is not active in production. `/api/config` returns `voiceEnabled: false`, and `/api/health` reports `tts.status: "unconfigured"`.
-- Same-origin Cloudflare routes for `/api/escalate` and `/api/tts` are absent, so those paths return HTTP 405 on `edstratumlabs.ai`; the deployed chat currently uses the direct Railway backend for `/api/chat`.
 - Wrangler is unauthenticated in this shell, and no Cloudflare deploy/control-plane token is present, so KV/D1 bindings and Pages env vars cannot be created or verified from here.
 
 ## Recommended Next Steps
@@ -122,7 +124,6 @@ Latest SOT gate status: frontend source, CI, and production rendering are health
 5. Create D1 database `stratum-conversations`, run `schema.sql`, bind it as `STRATUM_DB`, add `SESSION_SECRET`, then set KV runtime `persistenceEnabled: true` only after a live smoke plan is ready.
 6. Configure voice/TTS only after a safe rollout plan: Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, then KV runtime `voiceEnabled: true`.
 7. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
-8. Add same-origin Cloudflare proxy Functions for `/api/escalate` and `/api/tts`, or explicitly document that those routes are intentionally Railway-only.
-9. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
-10. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
-11. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
+8. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
+9. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
+10. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
