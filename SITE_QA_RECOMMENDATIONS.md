@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production code-bearing commit verified: `3904989`
+- Latest frontend production code-bearing commit verified: `c5f6431`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
@@ -13,10 +13,11 @@ Date: 2026-07-20
 - Current production entry asset: `/assets/index-BQPzEWy3.js`
 - Current STRATUM chat asset: `/assets/StratumChat-Dc9NE68U.js`
 - Current PDF snapshot assets: `/assets/stratumPDF-Bgc_chGe.js`, `/assets/pdf-vendor-B7fMFYQc.js`
+- Current public build manifest: `https://edstratumlabs.ai/build-manifest.json`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
-Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser TTS streaming, and production rendering are healthy at code-bearing commit `3904989`, but the full build spec is not yet complete because live Cloudflare/Railway configuration and the production RAG provider path remain pending.
+Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser TTS streaming, public build manifest, and production rendering are healthy at code-bearing commit `c5f6431`, but the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence activation remain pending.
 
 ## QA Completed
 
@@ -39,6 +40,7 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 - Same-origin proxy commit `e1ff6d6` is deployed on production. Main CI `29729914138` passed with `120 passed`; local `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused proxy/voice tests (`44 passed`), full Playwright suite (`120 passed` with one worker after a high-parallelism runner blank-page retry), and rendered production smoke passed.
 - Live `https://edstratumlabs.ai/api/escalate` with `X-Stratum-QA: true` returned `200` and `status: "suppressed"`, live `/api/tts` returned backend validation `422` for an invalid payload, and live `/api/tts` returned `503 tts_not_configured` for a valid validation-only payload without invoking ElevenLabs.
 - Browser TTS streaming commit `3904989` is deployed on production. Main CI `29731627328` passed with `122 passed`; local `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused voice browser tests (`16 passed`), full Playwright suite (`122 passed` with one worker), and rendered production smoke passed with zero voice controls and zero TTS calls while `voiceEnabled: false`.
+- Public build manifest commit `c5f6431` is deployed on production. Local QA passed on 2026-07-20: `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused STRATUM browser tests (`28 passed`), and full Playwright suite (`124 passed`). Hosted main CI `29733457960` passed with `124 passed`; Cloudflare Pages production succeeded; live `/build-manifest.json` returned HTTP 200 with `Cache-Control: public, max-age=60, must-revalidate`, commit `c5f6431`, backend URL `https://stratum-backend-production-a340.up.railway.app`, 13 assets, and a matching live chat-asset SHA-256 hash.
 
 ## Notes For Future Agents
 
@@ -56,6 +58,8 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 - PDF snapshot generation is client-side and lazy-loaded from `src/lib/stratumPDF.tsx`; there is no server round-trip or Node `fs`/`path`/`crypto` import in the client source.
 - Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/sessions`, `/api/escalate`, and `/api/tts`. The TTS player now targets same-origin `/api/tts` when voice playback is enabled.
 - Browser TTS playback streams `ReadableStream` chunks through MediaSource/Web Audio when supported, with the existing `arrayBuffer()` decode path kept as a fallback for unsupported browsers.
+- Public deployment metadata is available at `/build-manifest.json`. It intentionally includes only non-secret build data: git SHA, branch, build timestamp, backend URL, hashed asset paths, sizes, and SHA-256 hashes.
+- Hosted frontend CI currently emits a GitHub annotation that some pinned GitHub Actions target deprecated Node.js 20 and are being forced to Node.js 24. The run passes, but the workflow should be watched for upstream action-version churn.
 
 ## Completed Feature 1
 
@@ -130,3 +134,4 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 8. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 9. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
 10. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
+11. Keep `/build-manifest.json` as the first deploy verification check before deeper rendered QA on future frontend pushes.
