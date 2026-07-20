@@ -5,13 +5,13 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest source commit observed in production deployment metadata: `ec95e8b`
+- Latest production code commit verified by live bundle: `371f634`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-BmMnKl08.js`
-- Current STRATUM chat asset: `/assets/StratumChat-DcniEbxZ.js`
+- Current production entry asset: `/assets/index-Bg_rGm5t.js`
+- Current STRATUM chat asset: `/assets/StratumChat-CXnpkHWz.js`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
@@ -26,6 +26,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Live completed response contains discretion-safe escalation language using `Founding leadership team`.
 - Live production chatbot renders expandable RAG citation panels from backend `citations` SSE events.
 - Branch and production QA for RAG citations passed: local `npm run lint`, `npm run build`, `npm test -- --reporter=list` (`36 passed`), GitHub status `CI / build-and-test`, Cloudflare Pages production check, and live rendered smoke on `https://edstratumlabs.ai`.
+- Feature 2 escalation delivery UI is deployed. Local, branch, and production CI passed with `42` Playwright tests; live backend suppression endpoints passed; live rendered QA verified a real non-escalation backend chat and intercepted escalation success/failure confirmations without sending email.
 
 ## Notes For Future Agents
 
@@ -44,12 +45,11 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Enhancement spec Feature 1 citation UI delta is deployed: frontend `citations` SSE parsing, accessible expandable citation panels, representative mock citations, and `tests/rag.spec.ts`.
 - Production Cloudflare deployment for frontend commit `ec95e8b` succeeded, and live citation UI smoke passed against the Railway backend.
 
-## Feature 2 Branch Status
+## Completed Feature 2
 
-- Branch `feat/escalation-email` adds escalation delivery parsing and user-visible success/failure system confirmations after backend handoff events.
-- Local branch QA passed on 2026-07-20: `npm run lint`, `npm run build`, and `npm test -- --reporter=list` (`42 passed`).
-- Production live escalation UI should not be clicked until backend suppression is verified on the deployed service or the user explicitly requests an email test.
-- Follow-up fix `fix/production-backend-fallback` restores live Railway connectivity when Cloudflare Pages production builds without `VITE_STRATUM_API_URL`; localhost and branch previews remain mock-mode by default.
+- Enhancement spec Feature 2 is deployed: frontend `done.escalation` parsing, user-visible success/failure system confirmations, mock success/failure coverage, and `tests/escalation.spec.ts`.
+- Frontend commits `5955dff` and `371f634` are deployed on Cloudflare Pages production. `371f634` adds a production-host backend fallback for `edstratumlabs.ai` / `www.edstratumlabs.ai` while localhost and branch previews remain mock-mode by default.
+- Live rendered QA on 2026-07-20 verified the production site made one real non-escalation backend request for a RAG chat, displayed citations, and rendered escalation success/failure confirmations through intercepted SSE only, so no live handoff email was sent.
 
 ## Recommended Next Steps
 
@@ -59,7 +59,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
    - chatbot opens on desktop and mobile
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
-3. Merge and deploy Feature 2 after branch CI/preview pass, then verify backend suppression with `X-Stratum-QA` before any live escalation UI test.
+3. Keep production `VITE_STRATUM_API_URL` configured in Cloudflare Pages even though the source fallback now protects the live hostname.
 4. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
 5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.

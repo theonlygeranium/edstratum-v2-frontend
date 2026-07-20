@@ -88,13 +88,16 @@ When the Railway staging service is provisioned:
   - Live `/api/chat` SSE smoke returned HTTP 200, terminal `done`, and `3` citation rows with `X-Stratum-Eval: true`.
   - Live `https://edstratumlabs.ai` rendered the citation panel from the production backend and expanded excerpts successfully.
 
-## Branch Note — Escalation Email Safety
+## Production Note — Escalation Email Safety
 
 **Updated:** 2026-07-20
 
-- Feature 2 is implemented on backend/frontend branch `feat/escalation-email`, pending merge and production deployment.
-- Backend branch adds structured escalation delivery metadata to terminal `done` SSE events, a safe `/api/escalate` contract route, HTML plus plaintext Resend payloads, session rate limiting, env aliases `ESCALATION_EMAIL_TO` / `ESCALATION_EMAIL_FROM`, and notification suppression for `X-Stratum-QA: true`, `X-Stratum-QA: suppress-notifications`, and `X-Stratum-Eval: true`.
-- Frontend branch consumes delivery metadata and renders success/failure system confirmations without sending any separate duplicate request.
-- Branch QA completed before merge:
+- Feature 2 is deployed from backend commit `ad1593b` and frontend commits `5955dff` / `371f634`.
+- Backend adds structured escalation delivery metadata to terminal `done` SSE events, a safe `/api/escalate` contract route, HTML plus plaintext Resend payloads, session rate limiting, env aliases `ESCALATION_EMAIL_TO` / `ESCALATION_EMAIL_FROM`, and notification suppression for `X-Stratum-QA: true`, `X-Stratum-QA: suppress-notifications`, and `X-Stratum-Eval: true`.
+- Frontend consumes delivery metadata and renders success/failure system confirmations without sending any separate duplicate request. Commit `371f634` also restores live Railway connectivity when Cloudflare Pages production builds without `VITE_STRATUM_API_URL`.
+- QA completed before and after merge:
   - Backend: `./.venv/bin/pytest -q` -> `116 passed, 1 skipped`
   - Frontend: `npm run lint`, `npm run build`, `npm test -- --reporter=list` -> `42 passed`
+  - Production backend: `/api/escalate` with `X-Stratum-QA: true` -> `{ success: true, status: "suppressed", messageId: "qa-suppressed" }`
+  - Production chat: `/api/chat` with `X-Stratum-Eval: true` returned terminal `done.escalation.status: "suppressed"` for an explicit escalation prompt
+  - Live frontend: rendered success/failure confirmations were verified with intercepted SSE only, so no live handoff email was sent
