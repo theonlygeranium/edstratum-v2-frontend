@@ -183,7 +183,12 @@ function ServiceCardItem({ card, index }: { card: ServiceCard; index: number }) 
 
 export default function Services() {
   return (
-    <section id="services" aria-labelledby="services-heading" className="relative py-24 lg:py-32 bg-background">
+    <section
+      id="services"
+      aria-labelledby="services-heading"
+      data-section="services"
+      className="relative py-24 lg:py-32 bg-background"
+    >
       <div className="absolute inset-0 dot-bg opacity-40 pointer-events-none" aria-hidden="true" />
       <div className="section-container relative z-10">
         <m.header

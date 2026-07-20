@@ -8,6 +8,7 @@ const DEFAULT_PROMPT = 'What does an EdStratum engagement look like?'
 
 const frontendUrl = normalizeUrl(process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL)
 const expectedManifestCommit = process.env.EXPECTED_MANIFEST_COMMIT || ''
+const expectedMaxIntakeQuestions = readInt('EXPECTED_MAX_INTAKE_QUESTIONS', 7)
 const chatPrompt = process.env.LIVE_RENDER_PROMPT || DEFAULT_PROMPT
 const screenshotDir =
   process.env.LIVE_RENDER_SCREENSHOT_DIR ||
@@ -35,6 +36,14 @@ const overlayPatterns = [
 
 function normalizeUrl(value) {
   return value.trim().replace(/\/+$/, '')
+}
+
+function readInt(name, fallback) {
+  const value = process.env[name]
+  if (value === undefined || value === '') return fallback
+  const parsed = Number(value)
+  if (Number.isInteger(parsed) && parsed > 0) return parsed
+  throw new Error(`${name} must be a positive integer when set`)
 }
 
 function record(ok, name, detail = '') {
@@ -111,6 +120,13 @@ function assertDiagnosticsClean(diagnostics, label) {
   assertCheck(diagnostics.length === 0, `${label} console/page/request diagnostics are clean`, detail)
 }
 
+function diagnosticSummary(diagnostics) {
+  return diagnostics
+    .slice(0, 5)
+    .map((item) => `${item.type}: ${item.text}`)
+    .join(' | ')
+}
+
 async function readJson(url) {
   const response = await fetch(url, {
     headers: {
@@ -167,7 +183,7 @@ async function waitForDialogSettled(dialog) {
   record(true, 'STRATUM dialog animation settled before visual capture')
 }
 
-async function checkPageShell(page, label) {
+async function checkPageShell(page, label, diagnostics) {
   await page.goto(`${frontendUrl}/?live-render-smoke=${Date.now()}`, {
     waitUntil: 'domcontentloaded',
     timeout: 30_000,
@@ -175,6 +191,23 @@ async function checkPageShell(page, label) {
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {})
 
   const title = await page.title()
+  const trigger = page.getByRole('button', { name: /open stratum chat/i })
+  try {
+    await trigger.waitFor({ state: 'visible', timeout: 30_000 })
+  } catch (error) {
+    const detail = diagnosticSummary(diagnostics)
+    throw new Error(
+      `${label} STRATUM trigger did not render${detail ? `; diagnostics: ${detail}` : ''}; ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    )
+  }
+  await page
+    .waitForFunction('document.body.innerText.trim().length > 200', undefined, {
+      timeout: 15_000,
+    })
+    .catch(() => {})
   const bodyText = await page.locator('body').innerText({ timeout: 15_000 })
   const forbidden = forbiddenCopyFailures(bodyText)
   const overlays = overlayFailures(bodyText)
@@ -185,8 +218,6 @@ async function checkPageShell(page, label) {
   assertCheck(overlays.length === 0, `${label} has no framework error overlay`, overlays.join(', '))
   assertCheck(forbidden.length === 0, `${label} rendered copy has no forbidden patterns`, forbidden.join(', '))
 
-  const trigger = page.getByRole('button', { name: /open stratum chat/i })
-  await trigger.waitFor({ state: 'visible', timeout: 15_000 })
   assertCheck(await trigger.isEnabled(), `${label} STRATUM trigger is enabled`)
 
   return { trigger, bodyText }
@@ -201,7 +232,7 @@ async function runDesktopFlow(browser, config) {
   const diagnostics = attachDiagnostics(page)
 
   try {
-    const { trigger } = await checkPageShell(page, 'desktop')
+    const { trigger } = await checkPageShell(page, 'desktop', diagnostics)
     await capture(page, 'desktop-home')
 
     await trigger.click()
@@ -279,7 +310,7 @@ async function runMobileFlow(browser) {
   const diagnostics = attachDiagnostics(page)
 
   try {
-    const { trigger } = await checkPageShell(page, 'mobile')
+    const { trigger } = await checkPageShell(page, 'mobile', diagnostics)
     await trigger.click()
 
     const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
@@ -325,6 +356,11 @@ async function main() {
   const config = configResult.body
   assertCheck(configResult.response.status === 200, '/api/config returns HTTP 200')
   assertCheck(config.ragEnabled === true, 'runtime RAG is enabled for rendered live smoke', String(config.ragEnabled))
+  assertCheck(
+    config.maxIntakeQuestions === expectedMaxIntakeQuestions,
+    'runtime maxIntakeQuestions matches expected',
+    String(config.maxIntakeQuestions),
+  )
 
   const browser = await chromium.launch()
   try {

@@ -8,6 +8,7 @@ const expected = {
   ragEnabled: readBool('EXPECTED_RAG_ENABLED', true),
   voiceEnabled: readBool('EXPECTED_VOICE_ENABLED', false),
   persistenceEnabled: readBool('EXPECTED_PERSISTENCE_ENABLED', false),
+  maxIntakeQuestions: readInt('EXPECTED_MAX_INTAKE_QUESTIONS', 7),
   analyticsEnabled: readBool('EXPECTED_ANALYTICS_ENABLED', false),
   embeddingProvider: process.env.EXPECTED_EMBEDDING_PROVIDER || 'hash',
   vectorStoreProvider: process.env.EXPECTED_VECTOR_STORE_PROVIDER || 'chroma',
@@ -27,6 +28,14 @@ function readBool(name, fallback) {
   if (/^(1|true|yes)$/i.test(value)) return true
   if (/^(0|false|no)$/i.test(value)) return false
   throw new Error(`${name} must be true or false when set`)
+}
+
+function readInt(name, fallback) {
+  const value = process.env[name]
+  if (value === undefined || value === '') return fallback
+  const parsed = Number(value)
+  if (Number.isInteger(parsed) && parsed > 0) return parsed
+  throw new Error(`${name} must be a positive integer when set`)
 }
 
 function record(ok, name, detail = '') {
@@ -92,6 +101,19 @@ function assetPaths(manifest) {
     : []
 }
 
+function isAssetMime(path, contentType) {
+  if (/\.js$/i.test(path)) {
+    return /\b(application|text)\/javascript\b/i.test(contentType)
+  }
+  if (/\.css$/i.test(path)) {
+    return /\btext\/css\b/i.test(contentType)
+  }
+  if (/\.(png|jpe?g|gif|webp|avif|svg)$/i.test(path)) {
+    return /\bimage\//i.test(contentType)
+  }
+  return !/\btext\/html\b/i.test(contentType)
+}
+
 function forbiddenCopyFailures(text) {
   const patterns = [
     /calendly\.com/i,
@@ -136,6 +158,15 @@ async function main() {
   expect(Boolean(manifest.stylesheetAsset || paths.find((path) => /\/index-[\w-]+\.css$/.test(path))), 'manifest identifies stylesheet asset')
   expect(Boolean(chatAsset), 'manifest identifies STRATUM chat asset', chatAsset || 'missing')
 
+  for (const path of paths) {
+    const asset = await fetchWithTimeout(path, {
+      headers: { accept: '*/*', 'cache-control': 'no-cache' },
+    })
+    const contentType = asset.headers.get('content-type') || ''
+    expect(asset.status === 200, 'manifest asset returns HTTP 200', path)
+    expect(isAssetMime(path, contentType), 'manifest asset has non-HTML MIME', `${path} ${contentType}`)
+  }
+
   const root = await readText('/')
   expect(root.response.status === 200, 'site root returns HTTP 200')
   const rootForbidden = forbiddenCopyFailures(root.text)
@@ -157,6 +188,11 @@ async function main() {
     config.persistenceEnabled === expected.persistenceEnabled,
     'persistenceEnabled matches expected',
     String(config.persistenceEnabled),
+  )
+  expect(
+    config.maxIntakeQuestions === expected.maxIntakeQuestions,
+    'maxIntakeQuestions matches expected',
+    String(config.maxIntakeQuestions),
   )
 
   const frontendHealthResult = await readJson('/api/health')
