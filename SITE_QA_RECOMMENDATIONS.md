@@ -5,23 +5,23 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production app code/tooling commit verified locally and live: `b51a623`
-- Latest verified app code-bearing asset commit: `b51a623`; it refreshes the entry/chat/service bundle hashes after the Pages fallback fix and keeps the seven-question STRATUM intake contract active in live runtime config.
+- Latest frontend production app code/tooling commit verified locally and live: `afce38b`
+- Latest verified app code-bearing asset commit: `e1921ec`; it adds same-origin production chat routing through Cloudflare Pages `/api/chat`, refreshes the entry/chat/service bundle hashes, and keeps the seven-question STRATUM intake contract active in live runtime config.
 - GitHub Actions action-migration commit verified: `d01ce68`; frontend CI app-runtime migration commit verified: `f2c969b`; CI Playwright server-ownership fix commit `84e01ce` is already contained in current `main`; Wrangler pin commit `76b97ba`, live-smoke command commit `bb8f3b4`, rendered live-smoke command commit `52cdf47`, asset-smoke hardening commit `7eb42dd`, Pages fallback fix commit `b341b07`, and asset hash refresh commit `b51a623` are deployed, but hosted CI proof is pending because GitHub Actions run `29749256985` for report commit `0d9a142` failed before starting any steps due to an account billing/spending-limit blocker.
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-DjtEbwVx.js`
+- Current production entry asset: `/assets/index-C17Q75GX.js`
 - Current production stylesheet asset: `/assets/index-DH0EGGDC.css`
-- Current STRATUM chat asset: `/assets/StratumChat-C9GJIMk2.js`
-- Current Services section asset: `/assets/Services-_OuHsgfp.js`
+- Current STRATUM chat asset: `/assets/StratumChat-93aBKZtk.js`
+- Current Services section asset: `/assets/Services-CjOl6QYK.js`
 - Current PDF snapshot assets: `/assets/stratumPDF-Bgc_chGe.js`, `/assets/pdf-vendor-B7fMFYQc.js`
 - Current public build manifest: `https://edstratumlabs.ai/build-manifest.json`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
-Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, privacy-safe analytics source readiness, GitHub Actions Node 24 action/app runtime, pinned Wrangler source tooling, repeatable production live-smoke QA, rendered production smoke QA, seven-question intake runtime config, explicit asset MIME smoke coverage, Cloudflare Pages missing-asset fallback hardening, and production rendering are healthy through deployed app code/tooling commit `b51a623`. Hosted CI proof for `b51a623` is blocked by a GitHub account billing/spending-limit failure, and the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence/analytics activation remain pending.
+Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, privacy-safe analytics source readiness, GitHub Actions Node 24 action/app runtime, pinned Wrangler source tooling, repeatable production live-smoke QA, rendered production smoke QA, seven-question intake runtime config, explicit asset MIME smoke coverage, Cloudflare Pages missing-asset fallback hardening, and production rendering are healthy through deployed app code/tooling commit `afce38b`. Hosted CI proof for `afce38b` is blocked by a GitHub account billing/spending-limit failure, and the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence/analytics activation remain pending.
 
 ## QA Completed
 
@@ -30,7 +30,7 @@ Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS s
 - Source and built output scan clean for personal-name, direct-person CTA, and scheduling-link copy.
 - Local production preview in mock mode passes desktop and mobile chatbot open/respond checks.
 - Live production domain loads the source-built entrypoint `/assets/index-BChwigZm.js`.
-- Live production chatbot successfully reaches Railway `/api/chat` with HTTP 200.
+- Live production chatbot successfully reaches Railway `/api/chat` through same-origin Cloudflare Pages `/api/chat` with HTTP 200.
 - Live completed response contains discretion-safe escalation language using `Founding leadership team`.
 - Live production chatbot renders expandable RAG citation panels from backend `citations` SSE events.
 - Branch and production QA for RAG citations passed: local `npm run lint`, `npm run build`, `npm test -- --reporter=list` (`36 passed`), GitHub status `CI / build-and-test`, Cloudflare Pages production check, and live rendered smoke on `https://edstratumlabs.ai`.
@@ -61,26 +61,27 @@ Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS s
 - Live asset smoke hardening commit `7eb42dd` is deployed on production. It extends `npm run qa:live` and `npm run qa:live:rendered` to assert `maxIntakeQuestions: 7`, fetch every manifest asset, and fail if a JS/CSS asset is served as `text/html`; this caught stale Cloudflare edge fallback behavior on old asset paths.
 - Cloudflare Pages fallback fix commit `b341b07` is deployed on production. It removes the SPA-wide `_redirects` rewrite, adds a real top-level `404.html`, removes the immutable `/assets/*` header override, and adds regression coverage so missing assets return an explicit 404 instead of index HTML. Local Wrangler Pages dev verified real assets return JavaScript with `Cache-Control: public, max-age=0, must-revalidate`, while missing assets return 404/no-store.
 - Frontend asset hash refresh commit `b51a623` is deployed on production. Local QA passed with `npm run type-check`, `npm run lint`, `npm run build`, `./node_modules/.bin/wrangler pages functions build`, and full Playwright (`162 passed`). Post-deploy `EXPECTED_MANIFEST_COMMIT=b51a623 npm run qa:live` and `EXPECTED_MANIFEST_COMMIT=b51a623 npm run qa:live:rendered` both passed, verifying `/api/config.maxIntakeQuestions: 7`, manifest asset MIME, current entry `/assets/index-DjtEbwVx.js`, chat `/assets/StratumChat-C9GJIMk2.js`, service `/assets/Services-_OuHsgfp.js`, live non-escalation RAG with citations, hidden voice controls, and no live handoff email.
+- Same-origin chat proxy commit `e1921ec` is deployed on production. It adds the Cloudflare Pages Function `/api/chat`, forwards safe `X-Stratum-QA`, `X-Stratum-Eval`, and `X-Stratum-Session` headers to Railway, routes production browser chat through same-origin `https://edstratumlabs.ai/api/chat`, and keeps localhost/preview mock behavior unchanged when no backend env is configured. Follow-up QA tooling commits `c986e60` and `afce38b` make live smokes use the current analytics payload shape, tolerate completed SSE fetch abort diagnostics, and explicitly assert that rendered production chat uses same-origin `/api/chat` without direct Railway `/api/chat` calls. Local QA passed with `npm run type-check`, `npm run lint`, `npm run build`, `./node_modules/.bin/wrangler pages functions build`, focused Functions tests (`62 passed`), full Playwright with one worker (`170 passed`), and production-host Playwright simulation on desktop/mobile. Post-deploy `EXPECTED_MANIFEST_COMMIT=afce38b npm run qa:live` and `EXPECTED_MANIFEST_COMMIT=afce38b npm run qa:live:rendered` both passed; the rendered smoke verified live non-escalation RAG with citations, hidden voice controls, clean diagnostics, and `desktop chat request uses same-origin /api/chat: https://edstratumlabs.ai/api/chat`.
 - Backend release audit runtime-expectation commit `ac6a69a` is deployed on Railway. Backend local QA passed with py_compile, focused release-audit tests (`5 passed`), full pytest (`136 passed, 1 skipped`), `git diff --check`, and `.venv/bin/python scripts/live_release_audit.py --skip-github` with zero blockers. Post-deploy backend smoke passed, and `.venv/bin/python scripts/live_release_audit.py --include-conversation-matrix` confirmed public runtime plus the deployed 54-scenario matrix while still blocking only on branch protection and GitHub Actions billing failures.
 - Backend release audit max-intake gate commit `178124e` is deployed on Railway. It makes `.venv/bin/python scripts/live_release_audit.py` explicitly verify frontend `/api/config.maxIntakeQuestions`, defaulting to the seven-question SOT contract with non-secret overrides for future planned intake changes. Backend local QA passed with py_compile, focused release-audit tests (`7 passed`), full pytest (`138 passed, 1 skipped`), `git diff --check`, and public-only release audit with zero blockers. Post-deploy backend smoke passed, and release audit with `--include-conversation-matrix` confirmed frontend commit `0d9a142`, backend commit `178124e`, `maxIntakeQuestions: 7`, backend runtime `hash` / `chroma` / `writer`, TTS `unconfigured`, and the deployed 54-scenario matrix while still blocking only on branch protection and GitHub Actions billing failures.
 
 ## Notes For Future Agents
 
 - Do not edit deployed Cloudflare bundle artifacts directly unless source is unavailable and the change is urgent.
-- The chatbot uses `VITE_STRATUM_API_URL`; omit it locally to use mock mode and avoid accidental escalation emails.
+- Local and preview chatbot builds can use `VITE_STRATUM_API_URL` when live backend access is desired; omit it locally to use mock mode and avoid accidental escalation emails.
 - Set `VITE_STRATUM_QA=true` only for preview/staging/live QA builds that intentionally need `X-Stratum-QA: true`; keep it unset in production.
 - Do not trigger live escalation flows during QA unless notifications are explicitly suppressed or the user asks for an email test.
 - Cloudflare Pages is connected to the private GitHub frontend repo.
 - Pushes to `main` automatically deploy production; pushes to feature branches create preview deployments.
 - `deploy.sh` is an emergency direct-upload fallback only and requires explicit confirmation env vars; normal production releases should stay source-driven through GitHub-connected Cloudflare Pages.
-- The frontend has a production-host fallback to `https://stratum-backend-production-a340.up.railway.app` if `VITE_STRATUM_API_URL` is missing on `edstratumlabs.ai` or `www.edstratumlabs.ai`.
+- Production browser chat uses same-origin `https://edstratumlabs.ai/api/chat` on `edstratumlabs.ai` and `www.edstratumlabs.ai`; the Pages Function proxies to Railway using the safe `RAILWAY_API_URL` setting or the non-secret default backend origin.
 - Preview env vars were last verified as unset, so branch previews use mock chat unless the backend URL is added to preview settings.
 - CI posts commit status context `CI / build-and-test`; configure branch protection to require it before merges to `main`.
 - Production CORS allows `https://edstratumlabs.ai` and `http://localhost:5173`; other local or preview origins need explicit expansion.
 - D1 persistence is source-ready but inactive until Cloudflare D1 binding `STRATUM_DB`, env var `SESSION_SECRET`, schema execution, and KV runtime flag `persistenceEnabled: true` are configured. Source now includes scoped session deletion and admin retention purge primitives.
 - Voice/TTS is source-ready, including same-origin browser playback through MediaSource when supported, but inactive until Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, and runtime config `voiceEnabled: true` are configured. Same-origin `/api/tts` returns `tts_disabled` until runtime voice is enabled.
 - PDF snapshot generation is client-side and lazy-loaded from `src/lib/stratumPDF.tsx`; there is no server round-trip or Node `fs`/`path`/`crypto` import in the client source.
-- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/sessions`, `/api/escalate`, `/api/tts`, and `/api/analytics`. The TTS player now targets same-origin `/api/tts` when voice playback is enabled.
+- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/chat`, `/api/sessions`, `/api/escalate`, `/api/tts`, and `/api/analytics`. Production browser chat now targets same-origin `/api/chat`, which streams Railway `/api/chat` from the edge and keeps the Railway origin out of browser chat requests on `edstratumlabs.ai`.
 - Analytics is source-ready but inactive until the Cloudflare KV binding `ANALYTICS_EVENTS` exists. The browser analytics client emits only allowlisted event/property values, and the server stores aggregate daily counters rather than prompt text, intake answers, raw session IDs, or PII.
 - Frontend CI now runs the pinned project binary `./node_modules/.bin/wrangler pages functions build` after `npm run build` so Pages Functions syntax errors fail before deployment without resolving Wrangler dynamically.
 - Browser TTS playback streams `ReadableStream` chunks through MediaSource/Web Audio when supported, with the existing `arrayBuffer()` decode path kept as a fallback for unsupported browsers.
@@ -100,7 +101,7 @@ Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS s
 ## Completed Feature 2
 
 - Enhancement spec Feature 2 is deployed: frontend `done.escalation` parsing, user-visible success/failure system confirmations, mock success/failure coverage, and `tests/escalation.spec.ts`.
-- Frontend commits `5955dff` and `371f634` are deployed on Cloudflare Pages production. `371f634` adds a production-host backend fallback for `edstratumlabs.ai` / `www.edstratumlabs.ai` while localhost and branch previews remain mock-mode by default.
+- Frontend commits `5955dff` and `371f634` are deployed on Cloudflare Pages production. `371f634` added the original production-host backend fallback for `edstratumlabs.ai` / `www.edstratumlabs.ai` while localhost and branch previews remain mock-mode by default; production browser chat routing is now superseded by the same-origin `/api/chat` proxy from `e1921ec`.
 - Live rendered QA on 2026-07-20 verified the production site made one real non-escalation backend request for a RAG chat, displayed citations, and rendered escalation success/failure confirmations through intercepted SSE only, so no live handoff email was sent.
 
 ## Completed Feature 3
@@ -159,7 +160,7 @@ Latest SOT gate status: frontend source, same-origin proxy routes, browser TTS s
    - chatbot opens on desktop and mobile
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
-3. Keep production `VITE_STRATUM_API_URL` configured in Cloudflare Pages even though the source fallback now protects the live hostname.
+3. Keep `RAILWAY_API_URL` available in Cloudflare Pages if the backend origin changes; production browser chat now uses same-origin `/api/chat` regardless of `VITE_STRATUM_API_URL`.
 4. Create and bind Feature 3 KV namespaces in Cloudflare Pages once Wrangler or dashboard credentials are available.
 5. Create D1 database `stratum-conversations`, run `schema.sql`, bind it as `STRATUM_DB`, add `SESSION_SECRET`, choose an operational purge cadence using `/api/sessions/purge`, then set KV runtime `persistenceEnabled: true` only after a live smoke plan is ready.
 6. Configure voice/TTS only after a safe rollout plan: set Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, then KV runtime `voiceEnabled: true`.
