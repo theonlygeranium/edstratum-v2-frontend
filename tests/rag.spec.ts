@@ -65,3 +65,30 @@ test('RAG degradation: chat still works when no citation excerpts are available'
   })
   await expect(dialog.getByRole('button', { name: /sources?/i })).toHaveCount(0)
 })
+
+test('RAG citations are hidden when runtime config disables RAG', async ({ page }) => {
+  await page.route('/api/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ragEnabled: false,
+        voiceEnabled: false,
+        persistenceEnabled: false,
+        maxIntakeQuestions: 6,
+      }),
+    })
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
+
+  const dialog = await sendChatMessage(page, 'How should we plan an AI strategy implementation?')
+
+  await expect(dialog.getByText(/AI strategy defines the roadmap/i)).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect(dialog.getByRole('button', { name: /sources?/i })).toHaveCount(0)
+})

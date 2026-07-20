@@ -1,4 +1,4 @@
-export type VoiceInputStatus = 'idle' | 'listening' | 'processing'
+export type VoiceInputStatus = 'idle' | 'listening' | 'processing' | 'error'
 
 type SpeechRecognitionAlternative = {
   transcript?: string
@@ -97,7 +97,7 @@ export function createVoiceInputController(): VoiceInputController {
       }
     }
     instance.onerror = (event) => {
-      setStatus('idle')
+      setStatus('error')
       controller.onError(event.error || event.message || 'voice_input_error')
     }
     instance.onresult = (event) => {
@@ -130,6 +130,7 @@ export function createVoiceInputController(): VoiceInputController {
 
   function start() {
     if (!Recognition) {
+      setStatus('error')
       controller.onError('speech_recognition_unsupported')
       return
     }
@@ -144,7 +145,7 @@ export function createVoiceInputController(): VoiceInputController {
       setStatus('listening')
       recognition?.start()
     } catch {
-      setStatus('idle')
+      setStatus('error')
       controller.onError('voice_input_start_failed')
     }
   }

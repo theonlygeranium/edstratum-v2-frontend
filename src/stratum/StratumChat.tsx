@@ -309,6 +309,7 @@ export default function StratumChat() {
   const showVoiceInput = voiceFeatureEnabled && voiceSupported
   const showTTSControls = voiceFeatureEnabled && ttsFeatureFlagEnabled()
   const showDownloadSummary = chatPhase === 'complete' || chatPhase === 'escalated'
+  const showCitationPanels = runtimeConfig.ragEnabled
 
   useEffect(() => {
     messagesRef.current = messages
@@ -366,6 +367,8 @@ export default function StratumChat() {
         setVoiceAnnouncement('Listening for voice input.')
       } else if (status === 'processing') {
         setVoiceAnnouncement('Processing voice input.')
+      } else if (status === 'error') {
+        setVoiceAnnouncement('Voice input is unavailable.')
       }
     }
     controller.onTranscript = (transcript) => {
@@ -381,7 +384,7 @@ export default function StratumChat() {
       }
     }
     controller.onError = () => {
-      setVoiceStatus('idle')
+      setVoiceStatus('error')
       setVoiceAnnouncement('Voice input is unavailable.')
     }
 
@@ -439,7 +442,7 @@ export default function StratumChat() {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Accessibility: move focus into input when dialog opens
   useEffect(() => {
@@ -960,7 +963,7 @@ export default function StratumChat() {
                     >
                       {message.content ? <MessageContent content={message.content} /> : <TypingDots />}
                       {message.role !== 'system' && message.source ? <SourceBadge source={message.source} /> : null}
-                      {message.role !== 'system' && message.citations && message.citations.length > 0 ? (
+                      {showCitationPanels && message.role !== 'system' && message.citations && message.citations.length > 0 ? (
                         <CitationPanel citations={message.citations} />
                       ) : null}
                     </div>
@@ -1045,14 +1048,26 @@ export default function StratumChat() {
                   aria-pressed={voiceStatus === 'listening'}
                   aria-label={voiceStatus === 'listening' ? 'Stop voice input' : 'Start voice input'}
                   className={[
-                    'rounded-md border border-border px-3 py-2 text-sm font-semibold',
+                    'inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-semibold',
                     voiceStatus === 'listening'
-                      ? 'border-primary/60 bg-primary-dim text-text-accent'
+                      ? 'border-red-400/70 bg-red-500/10 text-red-200'
                       : 'bg-background text-text-secondary hover:border-primary/50 hover:bg-surface-raised',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                   ].join(' ')}
                 >
-                  {voiceStatus === 'listening' ? 'Stop' : 'Mic'}
+                  {voiceStatus === 'listening' ? (
+                    <>
+                      <span
+                        className="h-2 w-2 animate-pulse rounded-full bg-red-300"
+                        aria-hidden="true"
+                      />
+                      Listening...
+                    </>
+                  ) : voiceStatus === 'processing' ? (
+                    'Processing'
+                  ) : (
+                    'Mic'
+                  )}
                 </button>
               ) : null}
               <button
