@@ -75,7 +75,7 @@ test('RAG citations are hidden when runtime config disables RAG', async ({ page 
         ragEnabled: false,
         voiceEnabled: false,
         persistenceEnabled: false,
-        maxIntakeQuestions: 6,
+        maxIntakeQuestions: 7,
       }),
     })
   })

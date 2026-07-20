@@ -2,5 +2,5 @@
   "ragEnabled": true,
   "voiceEnabled": false,
   "persistenceEnabled": false,
-  "maxIntakeQuestions": 6
+  "maxIntakeQuestions": 7
 }

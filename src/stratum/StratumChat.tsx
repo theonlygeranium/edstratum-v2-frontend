@@ -23,6 +23,7 @@ import {
   ESCALATION_REQUEST_TEXT,
   INITIAL_GREETING,
   INTAKE_QUESTIONS,
+  MAX_INTAKE_QUESTIONS,
   PHASE_LABELS,
   PROMPT_CHIPS,
   VOICE_CONFIG,
@@ -55,7 +56,7 @@ const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   ragEnabled: true,
   voiceEnabled: false,
   persistenceEnabled: false,
-  maxIntakeQuestions: 6,
+  maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
 }
 
 type StreamAssistantOptions = {

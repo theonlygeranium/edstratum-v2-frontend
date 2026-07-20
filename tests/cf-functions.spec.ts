@@ -261,7 +261,7 @@ test('GET /api/config falls back when KV is absent or malformed', async () => {
     ragEnabled: true,
     voiceEnabled: false,
     persistenceEnabled: false,
-    maxIntakeQuestions: 6,
+    maxIntakeQuestions: 7,
   })
 
   const kv = new MemoryKV()
@@ -271,7 +271,7 @@ test('GET /api/config falls back when KV is absent or malformed', async () => {
       ragEnabled: false,
       voiceEnabled: true,
       persistenceEnabled: true,
-      maxIntakeQuestions: 99,
+      maxIntakeQuestions: 6,
     }),
   )
 
@@ -282,7 +282,7 @@ test('GET /api/config falls back when KV is absent or malformed', async () => {
     ragEnabled: false,
     voiceEnabled: true,
     persistenceEnabled: true,
-    maxIntakeQuestions: 6,
+    maxIntakeQuestions: 7,
   })
 })
 

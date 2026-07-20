@@ -17,11 +17,13 @@ export interface Env {
 export const DEFAULT_RAILWAY_API_URL =
   'https://stratum-backend-production-a340.up.railway.app'
 
+const DEFAULT_MAX_INTAKE_QUESTIONS = 7
+
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   ragEnabled: true,
   voiceEnabled: false,
   persistenceEnabled: false,
-  maxIntakeQuestions: 6,
+  maxIntakeQuestions: DEFAULT_MAX_INTAKE_QUESTIONS,
 }
 
 export function railwayApiUrl(env: Env) {
@@ -34,13 +36,6 @@ export function runtimeConfig(value: unknown): RuntimeConfig {
   }
 
   const candidate = value as Partial<RuntimeConfig>
-  const maxIntakeQuestions =
-    typeof candidate.maxIntakeQuestions === 'number' &&
-    Number.isInteger(candidate.maxIntakeQuestions) &&
-    candidate.maxIntakeQuestions > 0 &&
-    candidate.maxIntakeQuestions <= 12
-      ? candidate.maxIntakeQuestions
-      : DEFAULT_RUNTIME_CONFIG.maxIntakeQuestions
 
   return {
     ragEnabled:
@@ -55,7 +50,7 @@ export function runtimeConfig(value: unknown): RuntimeConfig {
       typeof candidate.persistenceEnabled === 'boolean'
         ? candidate.persistenceEnabled
         : DEFAULT_RUNTIME_CONFIG.persistenceEnabled,
-    maxIntakeQuestions,
+    maxIntakeQuestions: DEFAULT_MAX_INTAKE_QUESTIONS,
   }
 }
 

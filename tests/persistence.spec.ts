@@ -12,7 +12,7 @@ async function mockRuntimeConfig(page: Page, persistenceEnabled: boolean) {
         ragEnabled: true,
         voiceEnabled: false,
         persistenceEnabled,
-        maxIntakeQuestions: 6,
+        maxIntakeQuestions: 7,
       }),
     })
   })

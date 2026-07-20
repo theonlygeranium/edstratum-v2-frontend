@@ -91,6 +91,8 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   },
 ]
 
+export const MAX_INTAKE_QUESTIONS = INTAKE_QUESTIONS.length
+
 export const PHASE_LABELS: Record<ProcessingPhase, string> = {
   searching: 'Searching knowledge base',
   retrieving: 'Retrieving source context',

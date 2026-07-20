@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 /**
  * StratumChat QA Suite
@@ -35,6 +35,48 @@ test.beforeEach(async ({ page }) => {
   // Store errors list on the test so after-hooks can assert
   ;(page as unknown as Record<string, unknown>)['_consoleErrors'] = errors
 })
+
+const SOT_INTAKE_QUESTIONS = [
+  /What type of organization are you\?/i,
+  /Are you currently using Instructure Canvas\?/i,
+  /What problem are you trying to solve with AI\?/i,
+  /What is your current data infrastructure and quality level\?/i,
+  /Do you have an internal engineering team/i,
+  /What is your approximate timeline for an AI initiative\?/i,
+  /What does success look like in 6 months\?/i,
+]
+
+const SOT_INTAKE_ANSWERS = [
+  'Higher Ed institution',
+  'Yes, Canvas is our primary LMS',
+  'We need grounded support workflows',
+  'Developing',
+  'Hybrid',
+  'Exploring',
+  'A scoped pilot with clear evaluation data',
+]
+
+async function completeSotReadinessFlow(page: Page) {
+  await page.getByRole('button', { name: /open stratum chat/i }).click()
+  const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
+
+  await dialog.getByRole('button', { name: /run a quick ai readiness check/i }).click()
+  const sendBtn = dialog.getByRole('button', { name: 'Send', exact: true })
+
+  for (let index = 0; index < SOT_INTAKE_QUESTIONS.length; index += 1) {
+    await expect(dialog.getByText(SOT_INTAKE_QUESTIONS[index])).toBeVisible({
+      timeout: 10_000,
+    })
+    const input = dialog.getByPlaceholder(/answer the readiness question|ask stratum/i)
+    await input.fill(SOT_INTAKE_ANSWERS[index])
+    await sendBtn.click()
+  }
+
+  await expect(dialog.getByText(/AI Readiness Snapshot/i)).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect(dialog.getByText(/Relevant EdStratum Capabilities/i)).toBeVisible()
+}
 
 // ── Page load ────────────────────────────────────────────────────────────────
 
@@ -161,6 +203,33 @@ test('prompt chip click submits without error', async ({ page }) => {
   if (chipText) {
     await expect(dialog.locator('.bg-primary.text-white').filter({ hasText: chipText.trim() }).first()).toBeVisible({ timeout: 5000 })
   }
+})
+
+test('readiness check asks all seven SOT intake questions before snapshot', async ({ page }) => {
+  await completeSotReadinessFlow(page)
+})
+
+test('stale runtime maxIntakeQuestions cannot truncate SOT readiness intake', async ({ page }) => {
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ragEnabled: true,
+        voiceEnabled: false,
+        persistenceEnabled: false,
+        maxIntakeQuestions: 6,
+      }),
+    })
+  })
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
+
+  await completeSotReadinessFlow(page)
 })
 
 // ── Message flow ─────────────────────────────────────────────────────────────

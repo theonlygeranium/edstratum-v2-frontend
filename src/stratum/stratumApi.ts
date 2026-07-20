@@ -1,5 +1,9 @@
 import { getOrCreateSessionId } from '../lib/stratumSession'
-import { STRATUM_API_URL, STRATUM_BACKEND_ENABLED } from './stratumConfig'
+import {
+  MAX_INTAKE_QUESTIONS,
+  STRATUM_API_URL,
+  STRATUM_BACKEND_ENABLED,
+} from './stratumConfig'
 import { mockStreamResponse } from './stratumMock'
 import type {
   EscalationDelivery,
@@ -41,7 +45,7 @@ const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   ragEnabled: true,
   voiceEnabled: false,
   persistenceEnabled: false,
-  maxIntakeQuestions: 6,
+  maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
 }
 
 export function getSessionId() {
@@ -119,13 +123,6 @@ function normalizeRuntimeConfig(value: unknown): RuntimeConfig {
   }
 
   const config = value as Partial<RuntimeConfig>
-  const maxIntakeQuestions =
-    typeof config.maxIntakeQuestions === 'number' &&
-    Number.isInteger(config.maxIntakeQuestions) &&
-    config.maxIntakeQuestions > 0 &&
-    config.maxIntakeQuestions <= 12
-      ? config.maxIntakeQuestions
-      : DEFAULT_RUNTIME_CONFIG.maxIntakeQuestions
 
   return {
     ragEnabled:
@@ -140,7 +137,7 @@ function normalizeRuntimeConfig(value: unknown): RuntimeConfig {
       typeof config.persistenceEnabled === 'boolean'
         ? config.persistenceEnabled
         : DEFAULT_RUNTIME_CONFIG.persistenceEnabled,
-    maxIntakeQuestions,
+    maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
   }
 }
 
