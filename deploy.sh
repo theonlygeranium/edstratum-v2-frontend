@@ -34,16 +34,21 @@ echo ""
 echo "▶  Linting..."
 npm run lint
 
+if [[ ! -x ./node_modules/.bin/wrangler ]]; then
+  echo "Pinned Wrangler binary missing. Run npm ci before deploy.sh." >&2
+  exit 2
+fi
+
 echo "▶  Building..."
 npm run build
 
 echo ""
 echo "▶  Building Cloudflare Pages Functions..."
-npx wrangler pages functions build
+./node_modules/.bin/wrangler pages functions build
 
 echo ""
 echo "▶  Deploying to Cloudflare Pages branch ${branch}..."
-npx wrangler pages deploy dist \
+./node_modules/.bin/wrangler pages deploy dist \
   --project-name edstratumlabs \
   --branch "${branch}" \
   --commit-message "Emergency direct upload: $(date -u '+%Y-%m-%d %H:%M UTC')"
