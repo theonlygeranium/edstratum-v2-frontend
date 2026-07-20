@@ -44,6 +44,13 @@ import type {
 } from './stratumTypes'
 
 const SENTIMENT_ESCALATION_COOLDOWN_MS = 10 * 60 * 1000
+const PROMPT_CHIP_ANALYTICS: Record<string, string> = {
+  'Does AI make sense for my Canvas environment?': 'canvas_ai',
+  'What does an EdStratum engagement look like?': 'engagement_shape',
+  'Run a quick AI readiness check': 'readiness_check',
+  "AI strategy vs. AI implementation - what's the difference?": 'strategy_vs_implementation',
+  'Connect with the Founding leadership team': 'founding_leadership',
+}
 const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   ragEnabled: true,
   voiceEnabled: false,
@@ -56,7 +63,8 @@ type StreamAssistantOptions = {
   sentimentSignal?: SentimentEscalationSignal
 }
 
-type SubmitText = (text: string, forcedMode?: ConversationMode) => Promise<void>
+type SubmitSource = 'connect_button' | 'manual_submit' | 'prompt_chip' | 'voice'
+type SubmitText = (text: string, forcedMode?: ConversationMode, source?: SubmitSource) => Promise<void>
 
 function createId(prefix: string) {
   if (window.crypto?.randomUUID) {
@@ -293,6 +301,7 @@ export default function StratumChat() {
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(VOICE_CONFIG.ttsEnabledByDefault)
   const [pdfPending, setPdfPending] = useState(false)
   const messagesRef = useRef(messages)
+  const firstMessageTrackedRef = useRef(false)
   const lastSentimentSignalRef = useRef<SentimentSignal>('neutral')
   const lastEscalationAtRef = useRef<number | null>(null)
   const persistenceHydratedRef = useRef(false)
@@ -379,7 +388,7 @@ export default function StratumChat() {
       setVoiceAnnouncement('Voice input captured.')
       if (shouldAutoSubmitVoiceTranscript(transcript)) {
         window.setTimeout(() => {
-          void submitTextRef.current(transcript)
+          void submitTextRef.current(transcript, undefined, 'voice')
         }, 0)
       }
     }
@@ -571,6 +580,7 @@ export default function StratumChat() {
     appendMessage(assistantMessage(
       "This sounds time-sensitive. I'll make sure EdStratum's Founding leadership team sees the context right away.",
     ))
+    trackEvent('handoff_intent', { trigger: 'sentiment', signal })
     trackEvent('sentiment_escalation_triggered', { signal })
     lastEscalationAtRef.current = Date.now()
     await streamAssistantResponse('escalation', requestMessages, null, intakeAnswers, {
@@ -664,6 +674,7 @@ export default function StratumChat() {
           if (event.snapshot) {
             setChatPhase('complete')
             trackEvent('intake_completed')
+            trackEvent('readiness_completed')
             persistSessionFlags({ intakeComplete: true })
           }
           if (event.escalate) {
@@ -673,7 +684,10 @@ export default function StratumChat() {
               setSentimentEscalationFired(true)
             }
             persistSessionFlags({ escalated: true })
-            trackEvent('escalation_triggered', { trigger: event.escalate })
+            trackEvent('escalation_triggered', {
+              trigger: event.escalate,
+              deliveryStatus: event.escalation?.status ?? 'prepared',
+            })
             const confirmation = escalationConfirmation(event.escalation)
             if (confirmation) {
               appendMessage(systemMessage(confirmation))
@@ -685,6 +699,7 @@ export default function StratumChat() {
 
         if (event.type === 'error') {
           setActivePhases([])
+          trackEvent('backend_error', { mode: requestMode, status: 'stream_event' })
           assistantDraft = { ...assistantDraft, content: event.message }
           patchMessage(responseId, { content: event.message })
           persistAssistantDraft()
@@ -693,6 +708,7 @@ export default function StratumChat() {
       }
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError') {
+        trackEvent('backend_error', { mode: requestMode, status: 'unknown' })
         assistantDraft = {
           ...assistantDraft,
           content: 'STRATUM hit a temporary issue. Please try again in a moment.',
@@ -723,13 +739,25 @@ export default function StratumChat() {
     appendMessage(assistantMessage(questionText(0), { isIntakeQuestion: true }))
   }
 
-  async function submitText(text: string, forcedMode?: ConversationMode) {
+  async function submitText(
+    text: string,
+    forcedMode?: ConversationMode,
+    source: SubmitSource = 'manual_submit',
+  ) {
     const clean = text.trim()
     if (!clean || pending) {
       return
     }
 
     const requestMode = forcedMode ?? mode
+    if (!firstMessageTrackedRef.current) {
+      firstMessageTrackedRef.current = true
+      trackEvent('first_message_sent', {
+        mode: requestMode,
+        source,
+      })
+    }
+
     const nextUserMessage = userMessage(clean)
     const requestMessages = [...messagesRef.current, nextUserMessage]
     appendMessage(nextUserMessage)
@@ -773,14 +801,18 @@ export default function StratumChat() {
   submitTextRef.current = submitText
 
   function handlePrompt(label: string, promptMode: ConversationMode) {
-    trackEvent('prompt_chip_clicked', { chip: label })
+    trackEvent('prompt_chip_clicked', { chip: PROMPT_CHIP_ANALYTICS[label] ?? 'canvas_ai' })
     if (promptMode === 'intake') {
       startIntake()
       return
     }
 
+    if (promptMode === 'escalation') {
+      trackEvent('handoff_intent', { trigger: 'explicit' })
+    }
+
     const promptText = promptMode === 'escalation' ? ESCALATION_REQUEST_TEXT : label
-    void submitText(promptText, promptMode)
+    void submitText(promptText, promptMode, 'prompt_chip')
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -839,6 +871,11 @@ export default function StratumChat() {
     trackEvent('chatbot_opened')
   }
 
+  function handleExplicitHandoff() {
+    trackEvent('handoff_intent', { trigger: 'explicit' })
+    void submitText(ESCALATION_REQUEST_TEXT, 'escalation', 'connect_button')
+  }
+
   const showPromptChips = messages.length === 1 && !pending
 
   return (
@@ -893,7 +930,7 @@ export default function StratumChat() {
               </div>
               <button
                 type="button"
-                onClick={() => void submitText(ESCALATION_REQUEST_TEXT, 'escalation')}
+                onClick={handleExplicitHandoff}
                 disabled={pending || escalation !== null}
                 className="rounded-md px-2 py-1 text-xs font-semibold text-text-accent hover:bg-primary-dim disabled:cursor-not-allowed disabled:opacity-50"
               >

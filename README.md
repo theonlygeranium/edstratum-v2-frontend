@@ -50,6 +50,7 @@ does not deploy production unless confirmation environment variables are set.
 |----------|-------------|
 | `VITE_STRATUM_API_URL` | Public STRATUM backend origin, without trailing slash |
 | `VITE_STRATUM_QA` | Preview/staging only. When `true`, real-backend chat requests include `X-Stratum-QA: true` to suppress outbound notifications. Never enable in production. |
+| `VITE_ANALYTICS_ENDPOINT` | Optional privacy-safe analytics endpoint override. Defaults to same-origin `/api/analytics`; set to an empty string to disable browser beacons. |
 | `VITE_TTS_ENABLED` | Voice rollout only. Keep unset/false until Railway TTS credentials and Cloudflare runtime `voiceEnabled` are both intentionally enabled. |
 
 ## Architecture notes
@@ -59,6 +60,7 @@ does not deploy production unless confirmation environment variables are set.
 - **Design tokens**: All color, typography, and spacing tokens are defined in `src/index.css` under `@theme {}`. No `tailwind.config.js` exists.
 - **STRATUM chat**: The floating intake advisor lives in `src/stratum/`. It uses `VITE_STRATUM_API_URL` to stream `/api/chat` SSE events from Railway. If the URL is omitted outside the production hostnames, it falls back to the local demo stream and does not send escalation emails.
 - **Pages Functions**: `/api/health` proxies Railway `/api/health`, `/api/config` returns non-secret runtime flags, and `_middleware.ts` applies best-effort KV rate limiting when the `RATE_LIMIT` binding exists.
+- **Analytics readiness**: STRATUM emits privacy-safe funnel events for chat open, first message, readiness completion, backend errors, and handoff intent. `/api/analytics` stores aggregate daily counters only when the `ANALYTICS_EVENTS` KV binding exists; it does not store prompt text, answers, raw session IDs, or PII.
 - **Persistence readiness**: `/api/sessions` stores D1 conversation state only when `STRATUM_DB`, `SESSION_SECRET`, and runtime `persistenceEnabled` are configured. The reset control calls scoped session deletion, and admin-only `/api/sessions/purge` can remove sessions older than a bounded retention window.
 - **Voice readiness**: Browser voice controls require runtime `voiceEnabled`, build-time `VITE_TTS_ENABLED`, and same-origin microphone permission. The same-origin `/api/tts` Function also fails closed unless runtime `voiceEnabled` is true.
 - **Escalation discretion**: Client-facing copy should refer to the `Founding leadership team` until the backend confirms that a notification has been sent. Do not add personal names or scheduling links in the frontend unless they are explicitly provisioned and approved.

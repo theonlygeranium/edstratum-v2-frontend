@@ -75,6 +75,13 @@ function mockEscalationDelivery(): EscalationDelivery {
   }
 }
 
+function mockBackendError() {
+  return (
+    import.meta.env.VITE_MOCK_BACKEND_ERROR === 'true' ||
+    window.localStorage.getItem('stratum_mock_backend_error') === 'true'
+  )
+}
+
 function lastUserText(request: StratumStreamRequest) {
   return [...request.messages].reverse().find((message) => message.role === 'user')?.content ?? ''
 }
@@ -170,6 +177,14 @@ export async function* mockStreamResponse(
 ): AsyncGenerator<StreamEvent> {
   if (sentimentTestMode()) {
     window.__STRATUM_LAST_MOCK_REQUEST__ = request
+  }
+
+  if (mockBackendError()) {
+    yield {
+      type: 'error',
+      message: 'STRATUM could not complete that request. Please try again in a moment.',
+    }
+    return
   }
 
   const response = responseFor({

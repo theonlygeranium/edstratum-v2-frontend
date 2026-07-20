@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs'
 import { onRequest as middleware } from '../functions/_middleware'
 import { onRequestGet as config } from '../functions/api/config'
 import { onRequestPost as escalate } from '../functions/api/escalate'
+import {
+  onRequestOptions as analyticsOptions,
+  onRequestPost as analytics,
+} from '../functions/api/analytics'
 import { onRequestGet as health } from '../functions/api/health'
 import { onRequest as sessions } from '../functions/api/sessions/[[route]]'
 import { onRequestPost as tts } from '../functions/api/tts'
@@ -21,6 +25,10 @@ class MemoryKV {
 
   async put(key: string, value: string) {
     this.values.set(key, value)
+  }
+
+  entries() {
+    return [...this.values.entries()]
   }
 }
 
@@ -313,6 +321,192 @@ test('rate limiter returns 429 after 60 rapid requests', async () => {
   expect(limited.status).toBe(429)
   expect(limited.headers.get('Retry-After')).toBe('60')
   expect(await limited.json()).toEqual({ error: 'rate_limited' })
+})
+
+test('POST /api/analytics fails closed when analytics storage is unbound', async () => {
+  let upstreamCalls = 0
+  globalThis.fetch = async () => {
+    upstreamCalls += 1
+    return Response.json({})
+  }
+
+  const response = await analytics({
+    env: {},
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        {
+          event: 'chatbot_opened',
+          session: 'analytics-session',
+          ts: 1_800_000,
+        },
+      ]),
+    }),
+  } as never)
+
+  expect(response.status).toBe(503)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({ error: 'analytics_not_configured' })
+  expect(upstreamCalls).toBe(0)
+})
+
+test('POST /api/analytics records aggregate counters only', async () => {
+  Date.now = () => Date.parse('2026-07-20T12:00:00Z')
+  const kv = new MemoryKV()
+
+  const response = await analytics({
+    env: { ANALYTICS_EVENTS: kv },
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        {
+          event: 'chatbot_opened',
+          session: 'analytics-session',
+          ts: 1_800_000,
+          properties: {
+            content: 'Do not store this conversation text',
+          },
+        },
+        {
+          event: 'first_message_sent',
+          session: 'analytics-session',
+          ts: 1_800_001,
+          properties: {
+            mode: 'open',
+            source: 'manual_submit',
+            prompt: 'Do not store my prompt',
+          },
+        },
+        {
+          event: 'handoff_intent',
+          session: 'analytics-session',
+          ts: 1_800_002,
+          properties: {
+            trigger: 'explicit',
+          },
+        },
+      ]),
+    }),
+  } as never)
+
+  expect(response.status).toBe(202)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({ ok: true, count: 3 })
+
+  const entries = Object.fromEntries(kv.entries())
+  expect(JSON.parse(entries['analytics:v1:daily:2026-07-20:event:chatbot_opened'])).toEqual({
+    count: 1,
+    updatedAt: Date.parse('2026-07-20T12:00:00Z'),
+  })
+  expect(JSON.parse(entries['analytics:v1:daily:2026-07-20:event:first_message_sent'])).toMatchObject({
+    count: 1,
+  })
+  expect(JSON.parse(entries['analytics:v1:daily:2026-07-20:property:first_message_sent:mode:open'])).toMatchObject({
+    count: 1,
+  })
+  expect(JSON.parse(entries['analytics:v1:daily:2026-07-20:property:first_message_sent:source:manual_submit'])).toMatchObject({
+    count: 1,
+  })
+  expect(JSON.parse(entries['analytics:v1:daily:2026-07-20:property:handoff_intent:trigger:explicit'])).toMatchObject({
+    count: 1,
+  })
+  expect(JSON.stringify(entries)).not.toContain('conversation text')
+  expect(JSON.stringify(entries)).not.toContain('Do not store my prompt')
+  expect(JSON.stringify(entries)).not.toContain('analytics-session')
+})
+
+test('POST /api/analytics rejects malformed and unsafe payloads', async () => {
+  const kv = new MemoryKV()
+
+  const invalidJson = await analytics({
+    env: { ANALYTICS_EVENTS: kv },
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{',
+    }),
+  } as never)
+
+  expect(invalidJson.status).toBe(400)
+  expect(await invalidJson.json()).toEqual({ error: 'invalid_analytics_payload' })
+
+  const unknownEvent = await analytics({
+    env: { ANALYTICS_EVENTS: kv },
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        {
+          event: 'message_text',
+          session: 'analytics-session',
+          ts: 1_800_000,
+        },
+      ]),
+    }),
+  } as never)
+
+  expect(unknownEvent.status).toBe(400)
+  expect(await unknownEvent.json()).toEqual({ error: 'invalid_analytics_event' })
+
+  const oversizedBatch = await analytics({
+    env: { ANALYTICS_EVENTS: kv },
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Array.from({ length: 21 }, () => ({
+        event: 'chatbot_opened',
+        session: 'analytics-session',
+        ts: 1_800_000,
+      }))),
+    }),
+  } as never)
+
+  expect(oversizedBatch.status).toBe(413)
+  expect(await oversizedBatch.json()).toEqual({ error: 'analytics_batch_too_large' })
+  expect(kv.entries()).toHaveLength(0)
+})
+
+test('POST /api/analytics returns 503 when storage write fails', async () => {
+  class ThrowingKV extends MemoryKV {
+    override async put() {
+      throw new Error('storage unavailable')
+    }
+  }
+
+  const response = await analytics({
+    env: { ANALYTICS_EVENTS: new ThrowingKV() },
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        {
+          event: 'backend_error',
+          session: 'analytics-session',
+          ts: 1_800_000,
+          properties: { mode: 'open', status: 'stream_event' },
+        },
+      ]),
+    }),
+  } as never)
+
+  expect(response.status).toBe(503)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({ error: 'analytics_storage_unavailable' })
+})
+
+test('OPTIONS /api/analytics returns no-store preflight response', async () => {
+  const response = await analyticsOptions({
+    env: {},
+    request: new Request('https://edstratumlabs.ai/api/analytics', {
+      method: 'OPTIONS',
+    }),
+  } as never)
+
+  expect(response.status).toBe(204)
+  expect(response.headers.get('Allow')).toBe('POST, OPTIONS')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
 })
 
 test('X-Stratum-Session header is forwarded to upstream', async () => {
