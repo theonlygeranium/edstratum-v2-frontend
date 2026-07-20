@@ -68,7 +68,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // latest write within the same colo. This is the critical fix: the previous
   // implementation used RATE_LIMIT.get() with no cacheTtl override, so burst
   // requests all read a stale count of 0 and never triggered the 429 threshold.
-  const cached = await caches.default.match(cReq)
+  const cache = (caches as unknown as { default: Cache }).default
+  const cached = await cache.match(cReq)
   let current: RateLimitRecord
 
   if (cached) {
@@ -107,7 +108,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // Write to the edge Cache API (instant, per-colo). This ensures the next
   // request in the same colo sees the incremented count immediately.
-  await caches.default.put(
+  await cache.put(
     cReq,
     new Response(JSON.stringify(updated), {
       headers: {
