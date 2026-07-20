@@ -15,6 +15,7 @@ import type {
   ConversationMode,
   EscalationTrigger,
   ProcessingPhase,
+  RagCitation,
   ReadinessSnapshot,
   SourceConfidence,
 } from './stratumTypes'
@@ -93,6 +94,42 @@ function SourceBadge({ source }: { source: SourceConfidence }) {
   return (
     <div className="mt-2 rounded-md border border-border bg-background/70 px-2.5 py-1.5 text-[11px] leading-snug text-text-muted">
       Source: {source.label} - confidence {Math.round(source.score * 100)}%
+    </div>
+  )
+}
+
+function CitationPanel({ citations }: { citations: RagCitation[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const [panelId] = useState(() => createId('citation-panel'))
+
+  if (citations.length === 0) {
+    return null
+  }
+
+  const sourceNames = citations.map((citation) => citation.source).join(', ')
+
+  return (
+    <div className="mt-2 rounded-md border border-border bg-background/70 text-[11px] leading-snug text-text-muted">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left font-medium text-text-secondary hover:bg-surface-raised"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span>{citations.length === 1 ? '1 source' : `${citations.length} sources`}</span>
+        <span className="min-w-0 flex-1 truncate text-right text-text-muted">{sourceNames}</span>
+      </button>
+      {expanded ? (
+        <div id={panelId} className="space-y-2 border-t border-border px-2.5 py-2">
+          {citations.map((citation) => (
+            <div key={`${citation.source}-${citation.excerpt.slice(0, 24)}`}>
+              <div className="font-semibold text-text">{citation.source}</div>
+              <p className="mt-1 text-text-muted">{citation.excerpt}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -295,6 +332,10 @@ export default function StratumChat() {
 
         if (event.type === 'source') {
           patchMessage(responseId, { source: event.source })
+        }
+
+        if (event.type === 'citations') {
+          patchMessage(responseId, { citations: event.data })
         }
 
         if (event.type === 'token') {
@@ -507,6 +548,9 @@ export default function StratumChat() {
                     >
                       {message.content ? <MessageContent content={message.content} /> : <TypingDots />}
                       {message.source ? <SourceBadge source={message.source} /> : null}
+                      {message.citations && message.citations.length > 0 ? (
+                        <CitationPanel citations={message.citations} />
+                      ) : null}
                     </div>
                   </div>
                 ))}

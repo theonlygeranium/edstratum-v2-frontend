@@ -26,7 +26,11 @@ test.beforeEach(async ({ page }) => {
   })
   page.on('pageerror', (err) => errors.push(err.message))
 
-  await page.goto('/')
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
+    state: 'visible',
+    timeout: 10_000,
+  })
 
   // Store errors list on the test so after-hooks can assert
   ;(page as unknown as Record<string, unknown>)['_consoleErrors'] = errors

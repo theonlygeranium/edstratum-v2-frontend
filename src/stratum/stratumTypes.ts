@@ -21,6 +21,11 @@ export interface SourceConfidence {
   grounded: boolean
 }
 
+export interface RagCitation {
+  source: string
+  excerpt: string
+}
+
 export interface ReadinessSnapshot {
   situation: string
   capabilities: string
@@ -41,6 +46,7 @@ export interface ChatMessage {
   timestamp: number
   phases?: ProcessingPhase[]
   source?: SourceConfidence | null
+  citations?: RagCitation[]
   isIntakeQuestion?: boolean
 }
 
@@ -59,6 +65,11 @@ export type SourceEvent = {
   source: SourceConfidence
 }
 
+export type CitationsEvent = {
+  type: 'citations'
+  data: RagCitation[]
+}
+
 export type DoneEvent = {
   type: 'done'
   snapshot?: ReadinessSnapshot | null
@@ -74,6 +85,7 @@ export type StreamEvent =
   | PhaseEvent
   | TokenEvent
   | SourceEvent
+  | CitationsEvent
   | DoneEvent
   | ErrorEvent
 

@@ -34,6 +34,12 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - CI posts commit status context `CI / build-and-test`; configure branch protection to require it before merges to `main`.
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 
+## In-Flight Feature Branch
+
+- Branch `feat/rag-backend` is implementing the enhancement spec's citation UI delta: frontend `citations` SSE parsing, accessible expandable citation panels, representative mock citations, and `tests/rag.spec.ts`.
+- Local branch QA passed on 2026-07-20 with `npm run lint`, `npm run build`, and `npm test -- --reporter=list` (`36 passed`).
+- This is not production evidence until the feature branch is merged to `main`, frontend CI is green, Cloudflare production deploys, and live QA confirms the production bundle.
+
 ## Recommended Next Steps
 
 1. Add/verify Cloudflare preview env var `VITE_STRATUM_API_URL` if preview branches should exercise the live backend instead of mock chat.

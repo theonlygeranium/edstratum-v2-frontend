@@ -3,6 +3,7 @@ import { mockStreamResponse } from './stratumMock'
 import type {
   EscalationTrigger,
   ProcessingPhase,
+  RagCitation,
   ReadinessSnapshot,
   SourceConfidence,
   StratumStreamRequest,
@@ -61,6 +62,15 @@ function isSource(value: unknown): value is SourceConfidence {
   )
 }
 
+function isCitation(value: unknown): value is RagCitation {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const citation = value as RagCitation
+  return typeof citation.source === 'string' && typeof citation.excerpt === 'string'
+}
+
 function isReadinessSnapshot(value: unknown): value is ReadinessSnapshot {
   if (!value || typeof value !== 'object') {
     return false
@@ -99,6 +109,10 @@ function normalizeStreamEvent(value: unknown): StreamEvent | null {
 
   if (event.type === 'source' && isSource(event.source)) {
     return { type: 'source', source: event.source }
+  }
+
+  if (event.type === 'citations' && Array.isArray(event.data) && event.data.every(isCitation)) {
+    return { type: 'citations', data: event.data }
   }
 
   if (event.type === 'done') {

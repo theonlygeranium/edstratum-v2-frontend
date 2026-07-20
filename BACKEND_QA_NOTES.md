@@ -71,3 +71,16 @@ When the Railway staging service is provisioned:
 - Do not trigger the live Connect button or any escalation path during automated QA unless `X-Stratum-QA` suppression is confirmed active on the backend.
 - The mock layer in `stratumMock.ts` already handles escalation events safely — prefer mock mode for all routine frontend testing.
 - The Railway backend URL is compiled into the production bundle at build time via `VITE_STRATUM_API_URL`. Changing it requires a new Cloudflare Pages deployment.
+
+---
+
+## Feature Branch Note — `feat/rag-backend`
+
+**Updated:** 2026-07-20
+
+- Backend branch `feat/rag-backend` adds a `citations` SSE event with `{ source, excerpt }` rows for grounded RAG answers, while preserving the existing `source` confidence event and terminal `done` event.
+- Frontend branch `feat/rag-backend` parses the new event, stores citations on assistant messages, renders an accessible expandable citation panel, and keeps mock mode representative.
+- Local QA completed on the branch:
+  - Backend: `./.venv/bin/pytest -q` -> `112 passed, 1 skipped`
+  - Frontend: `npm run lint`, `npm run build`, `npm test -- --reporter=list` -> `36 passed`
+- This note is branch status only. It does not prove production deployment until both repos are merged/deployed and live QA confirms the production bundle/backend event stream.

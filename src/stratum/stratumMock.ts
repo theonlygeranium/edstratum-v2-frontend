@@ -1,5 +1,6 @@
 import { ESCALATION_REQUEST_TEXT, INTAKE_QUESTIONS } from './stratumConfig'
 import type {
+  RagCitation,
   ReadinessSnapshot,
   SourceConfidence,
   StratumStreamRequest,
@@ -11,6 +12,19 @@ const MOCK_SOURCE: SourceConfidence = {
   score: 0.86,
   grounded: true,
 }
+
+const MOCK_CITATIONS: RagCitation[] = [
+  {
+    source: 'EdStratum Services',
+    excerpt:
+      'EdStratum supports AI implementation strategy, Canvas LMS integration, production RAG engineering, learning analytics, workflow automation, and fractional AI leadership.',
+  },
+  {
+    source: 'STRATUM RAG Methodology',
+    excerpt:
+      'STRATUM answers should be grounded in a maintained knowledge base with semantic chunking, keyword search, vector-style semantic matching, and reranking where available.',
+  },
+]
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
@@ -53,6 +67,7 @@ function responseFor(request: StratumStreamRequest) {
       text:
         'EdStratum Labs is a founder-led AI strategy and implementation consultancy focused on practical AI systems for EdTech, Canvas LMS workflows, RAG engineering, and customer education. The operating style is evidence-driven: clarify the workflow, confirm the data foundation, and ship the smallest useful production pilot before expanding scope.',
       source: MOCK_SOURCE,
+      citations: [MOCK_CITATIONS[0]],
     }
   }
 
@@ -91,6 +106,7 @@ function responseFor(request: StratumStreamRequest) {
     phases: ['searching', 'retrieving', 'composing'] as const,
     text: fallbackText,
     source: MOCK_SOURCE,
+    citations: mentionsCanvas || mentionsStrategy ? MOCK_CITATIONS : [],
   }
 }
 
@@ -125,6 +141,12 @@ export async function* mockStreamResponse(
   for (const token of response.text.match(/\S+\s*/g) ?? []) {
     yield { type: 'token', token }
     await delay(18)
+  }
+
+  const citations: RagCitation[] = 'citations' in response ? response.citations ?? [] : []
+  if (citations.length > 0) {
+    yield { type: 'citations', data: citations }
+    await delay(60)
   }
 
   yield {
