@@ -37,6 +37,52 @@ class MemoryKV {
   }
 }
 
+/**
+ * In-memory mock for the Cloudflare Cache API (`caches.default`).
+ * The rate-limit middleware reads/writes counters via `cache.match()` and
+ * `cache.put()` using synthetic Request objects as keys. This mock reproduces
+ * that contract so unit tests can exercise the middleware without a real
+ * Workers runtime.
+ */
+class MemoryCache {
+  private entries = new Map<string, Response>()
+
+  async match(request: Request): Promise<Response | undefined> {
+    const stored = this.entries.get(request.url)
+    if (stored) {
+      // Return a clone so callers can independently consume the body
+      return new Response(stored.body, {
+        status: stored.status,
+        statusText: stored.statusText,
+        headers: stored.headers,
+      })
+    }
+    return undefined
+  }
+
+  async put(request: Request, response: Response): Promise<void> {
+    // Clone the response body so it can be read multiple times
+    const body = await response.text()
+    this.entries.set(request.url, new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    }))
+  }
+}
+
+/**
+ * Install a `caches` global with a `default` MemoryCache instance.
+ * Must be called before any middleware test that exercises the rate limiter,
+ * since the middleware accesses `caches.default` at runtime.
+ */
+function installCacheApi() {
+  const cache = new MemoryCache()
+  const cachesMock = { default: cache }
+  ;(globalThis as unknown as { caches: unknown }).caches = cachesMock
+  return cache
+}
+
 interface SessionRow {
   id: string
   created_at: number
@@ -313,6 +359,12 @@ test('rate limiter returns 429 after 60 rapid requests', async () => {
   Date.now = () => 1_800_000
   const kv = new MemoryKV()
   const next = async () => new Response('ok', { status: 200 })
+  // The middleware reads/writes the edge Cache API (caches.default) for
+  // instant per-colo counter reads. Install an in-memory mock so the test
+  // exercises the same code path as production.
+  installCacheApi()
+  // The middleware calls context.waitUntil() for the background KV persist.
+  const waitUntil = async (promise: Promise<unknown>) => { await promise }
 
   for (let index = 0; index < 60; index += 1) {
     const response = await middleware({
@@ -321,6 +373,7 @@ test('rate limiter returns 429 after 60 rapid requests', async () => {
         headers: { 'CF-Connecting-IP': '203.0.113.10' },
       }),
       next,
+      waitUntil,
     } as never)
     expect(response.status).toBe(200)
   }
@@ -331,6 +384,7 @@ test('rate limiter returns 429 after 60 rapid requests', async () => {
       headers: { 'CF-Connecting-IP': '203.0.113.10' },
     }),
     next,
+    waitUntil,
   } as never)
 
   expect(limited.status).toBe(429)
