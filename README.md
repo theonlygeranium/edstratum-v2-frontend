@@ -30,6 +30,21 @@ VITE_STRATUM_API_URL=https://stratum-backend-production-a340.up.railway.app npm 
 # Output: dist/
 ```
 
+## Live QA
+
+```bash
+npm run qa:live
+```
+
+The live smoke checks production without sending handoff email or generating
+voice audio. It verifies `/build-manifest.json`, safe runtime flags,
+same-origin `/api/health`, disabled `/api/tts` fail-closed behavior,
+privacy-safe `/api/analytics` fail-closed behavior while KV is unbound, direct
+Railway `/api/health` and `/api/runtime`, and forbidden-copy scans on the root
+HTML plus current STRATUM chat asset. Override `FRONTEND_URL`, `BACKEND_URL`,
+and `EXPECTED_*` env vars only when intentionally testing a staged rollout
+state.
+
 ## Deployment
 
 Cloudflare Pages is connected to this GitHub repo. The normal production path is:

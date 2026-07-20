@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/generate-build-manifest.mjs",
     "preview": "vite preview",
+    "qa:live": "node scripts/live-smoke.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "playwright test",
