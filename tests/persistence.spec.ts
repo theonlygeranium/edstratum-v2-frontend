@@ -38,13 +38,16 @@ async function sendMessage(page: Page, text: string) {
 function persistenceRouter(options: {
   sessionId?: string
   token?: string
+  createdSessionIds?: string[]
   restoredMessages?: unknown[]
   failWrites?: boolean
   onMessageWrite?: (body: unknown) => void
+  onSessionDelete?: (sessionId: string) => void
   onSessionCall?: () => void
 }) {
   const sessionId = options.sessionId ?? 'stratum-persist-test'
   const token = options.token ?? 'session-token'
+  let createCount = 0
 
   return async (route: Route) => {
     options.onSessionCall?.()
@@ -53,10 +56,12 @@ function persistenceRouter(options: {
     const method = request.method()
 
     if (method === 'POST' && url.pathname === '/api/sessions') {
+      const createdSessionId = options.createdSessionIds?.[createCount] ?? sessionId
+      createCount += 1
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify({ sessionId, sessionToken: token }),
+        body: JSON.stringify({ sessionId: createdSessionId, sessionToken: token }),
       })
       return
     }
@@ -84,6 +89,16 @@ function persistenceRouter(options: {
     }
 
     if (method === 'PATCH' && url.pathname === `/api/sessions/${sessionId}`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+      })
+      return
+    }
+
+    if (method === 'DELETE' && url.pathname.startsWith('/api/sessions/')) {
+      options.onSessionDelete?.(decodeURIComponent(url.pathname.split('/').at(-1) ?? ''))
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -205,4 +220,30 @@ test('D1 write failure does not block or error the chat UI', async ({ page }) =>
     timeout: 15_000,
   })
   await expect(dialog.getByText(/temporary issue/i)).toHaveCount(0)
+})
+
+test('clear conversation deletes the persisted session before starting a new one', async ({ page }) => {
+  const deletedSessions: string[] = []
+  await mockRuntimeConfig(page, true)
+  await page.route('**/api/sessions**', persistenceRouter({
+    sessionId: 'stratum-reset-old',
+    createdSessionIds: ['stratum-reset-old', 'stratum-reset-new'],
+    onSessionDelete: (sessionId) => {
+      deletedSessions.push(sessionId)
+    },
+  }))
+
+  const dialog = await openChat(page)
+  await page.waitForFunction(
+    (key) => window.localStorage.getItem(key) === 'stratum-reset-old',
+    SESSION_KEY,
+  )
+
+  await dialog.getByRole('button', { name: /clear conversation and start over/i }).click()
+
+  await expect.poll(() => deletedSessions).toEqual(['stratum-reset-old'])
+  await expect.poll(
+    async () => page.evaluate((key) => window.localStorage.getItem(key), SESSION_KEY),
+  ).toBe('stratum-reset-new')
+  await expect(dialog.getByText(/Hi, I'm STRATUM/i)).toBeVisible()
 })

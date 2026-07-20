@@ -50,7 +50,7 @@ In `.github/workflows/ci.yml`, the preview server runs without `VITE_STRATUM_API
 When the Railway staging service is provisioned:
 
 - [ ] Set `RAILWAY_ENV=staging` in Railway env vars
-- [ ] Configure backend CORS to allow `*.edstratumlabs.pages.dev` (CF Pages preview URLs)
+- [ ] Configure backend CORS with each exact Cloudflare Pages preview/staging origin, or add a reviewed backend source change for regex-based preview origin support. The current backend uses exact `allow_origins`, not wildcard matching.
 - [ ] Set `VITE_STRATUM_API_URL=https://<staging-service>.up.railway.app` in CF Pages **Preview** env vars
 - [ ] Set `VITE_STRATUM_QA=true` in CF Pages **Preview** env vars
 - [ ] Confirm staging backend reads `X-Stratum-QA` and suppresses outbound notifications

@@ -1,4 +1,9 @@
-import { jsonResponse, railwayApiUrl, type Env } from './_types'
+import {
+  jsonResponse,
+  railwayApiUrl,
+  runtimeConfig,
+  type Env,
+} from './_types'
 
 function forwardedHeaders(request: Request) {
   const headers = new Headers({
@@ -24,7 +29,32 @@ function responseHeaders(upstream: Response) {
   return headers
 }
 
+async function runtimeVoiceEnabled(env: Env) {
+  if (!env.STRATUM_CONFIG) {
+    return false
+  }
+
+  try {
+    const config = await env.STRATUM_CONFIG.get('runtime', { type: 'json' })
+    return runtimeConfig(config).voiceEnabled
+  } catch {
+    return false
+  }
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
+  if (!(await runtimeVoiceEnabled(env))) {
+    return jsonResponse(
+      { detail: 'tts_disabled' },
+      {
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      },
+    )
+  }
+
   const upstreamUrl = `${railwayApiUrl(env)}/api/tts`
 
   try {

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 
 import { onRequest as middleware } from '../functions/_middleware'
 import { onRequestGet as config } from '../functions/api/config'
@@ -142,6 +143,42 @@ class MemoryD1Statement {
       }
     }
 
+    if (this.query === 'DELETE FROM messages WHERE session_id = ?') {
+      const sessionId = String(this.values[0])
+      for (const [id, message] of this.db.messages) {
+        if (message.session_id === sessionId) {
+          this.db.messages.delete(id)
+        }
+      }
+    }
+
+    if (this.query === 'DELETE FROM sessions WHERE id = ?') {
+      this.db.sessions.delete(String(this.values[0]))
+    }
+
+    if (this.query.startsWith('DELETE FROM messages WHERE session_id IN')) {
+      const cutoff = Number(this.values[0])
+      const expired = new Set(
+        [...this.db.sessions.values()]
+          .filter((session) => session.last_active < cutoff)
+          .map((session) => session.id),
+      )
+      for (const [id, message] of this.db.messages) {
+        if (expired.has(message.session_id)) {
+          this.db.messages.delete(id)
+        }
+      }
+    }
+
+    if (this.query === 'DELETE FROM sessions WHERE last_active < ?') {
+      const cutoff = Number(this.values[0])
+      for (const [id, session] of this.db.sessions) {
+        if (session.last_active < cutoff) {
+          this.db.sessions.delete(id)
+        }
+      }
+    }
+
     return { success: true }
   }
 }
@@ -239,6 +276,14 @@ test('GET /api/config falls back when KV is absent or malformed', async () => {
     persistenceEnabled: true,
     maxIntakeQuestions: 6,
   })
+})
+
+test('security headers allow same-origin microphone only for voice readiness', () => {
+  const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
+
+  expect(headers).toContain('Permissions-Policy:')
+  expect(headers).toContain('microphone=(self)')
+  expect(headers).not.toContain('microphone=()')
 })
 
 test('rate limiter returns 429 after 60 rapid requests', async () => {
@@ -388,6 +433,8 @@ test('POST /api/escalate preserves Railway delivery failure status', async () =>
 })
 
 test('POST /api/tts proxies audio stream and session header to Railway', async () => {
+  const kv = new MemoryKV()
+  await kv.put('runtime', JSON.stringify({ voiceEnabled: true }))
   let forwardedUrl = ''
   let forwardedBody = ''
   let forwardedHeaders = new Headers()
@@ -405,7 +452,7 @@ test('POST /api/tts proxies audio stream and session header to Railway', async (
   }
 
   const response = await tts({
-    env: { RAILWAY_API_URL: 'https://railway.example/' },
+    env: { RAILWAY_API_URL: 'https://railway.example/', STRATUM_CONFIG: kv },
     request: new Request('https://edstratumlabs.ai/api/tts', {
       method: 'POST',
       headers: {
@@ -427,7 +474,58 @@ test('POST /api/tts proxies audio stream and session header to Railway', async (
   expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3])
 })
 
+test('POST /api/tts fails closed when runtime voice is disabled', async () => {
+  const kv = new MemoryKV()
+  await kv.put('runtime', JSON.stringify({ voiceEnabled: false }))
+  let upstreamCalls = 0
+  globalThis.fetch = async () => {
+    upstreamCalls += 1
+    return new Response(new Uint8Array([1, 2, 3]))
+  }
+
+  for (const env of [{}, { STRATUM_CONFIG: kv }]) {
+    const response = await tts({
+      env,
+      request: new Request('https://edstratumlabs.ai/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Do not proxy while disabled.' }),
+      }),
+    } as never)
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(await response.json()).toEqual({ detail: 'tts_disabled' })
+  }
+  expect(upstreamCalls).toBe(0)
+})
+
+test('POST /api/tts fails closed when runtime config is malformed', async () => {
+  const kv = new MemoryKV()
+  await kv.put('runtime', 'not-json')
+  let upstreamCalls = 0
+  globalThis.fetch = async () => {
+    upstreamCalls += 1
+    return new Response(new Uint8Array([1, 2, 3]))
+  }
+
+  const response = await tts({
+    env: { STRATUM_CONFIG: kv },
+    request: new Request('https://edstratumlabs.ai/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'Do not proxy with malformed config.' }),
+    }),
+  } as never)
+
+  expect(response.status).toBe(503)
+  expect(await response.json()).toEqual({ detail: 'tts_disabled' })
+  expect(upstreamCalls).toBe(0)
+})
+
 test('POST /api/tts preserves Railway validation failure response', async () => {
+  const kv = new MemoryKV()
+  await kv.put('runtime', JSON.stringify({ voiceEnabled: true }))
   globalThis.fetch = async () =>
     Response.json(
       { detail: [{ type: 'string_type', loc: ['body', 'text'] }] },
@@ -435,7 +533,7 @@ test('POST /api/tts preserves Railway validation failure response', async () => 
     )
 
   const response = await tts({
-    env: { RAILWAY_API_URL: 'https://railway.example' },
+    env: { RAILWAY_API_URL: 'https://railway.example', STRATUM_CONFIG: kv },
     request: new Request('https://edstratumlabs.ai/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -572,6 +670,115 @@ test('PATCH /api/sessions/:id updates session flags', async () => {
     escalated: 1,
     intake_complete: 1,
   })
+})
+
+test('DELETE /api/sessions/:id removes scoped D1 session and messages', async () => {
+  const { db, sessionId, sessionToken } = await createPersistedSession()
+  db.messages.set('message-1', {
+    id: 'message-1',
+    session_id: sessionId,
+    role: 'user',
+    content: 'Delete my conversation.',
+    citations_json: null,
+    created_at: 10,
+  })
+
+  const response = await sessions({
+    env: { STRATUM_DB: db, SESSION_SECRET: 'test-secret' },
+    request: new Request(`https://edstratumlabs.ai/api/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+      },
+    }),
+    params: { route: [sessionId] },
+  } as never)
+
+  expect(response.status).toBe(200)
+  expect(await response.json()).toEqual({ ok: true })
+  expect(db.sessions.has(sessionId)).toBe(false)
+  expect([...db.messages.values()].some((message) => message.session_id === sessionId)).toBe(false)
+})
+
+test('POST /api/sessions/purge removes sessions past the retention window with admin auth', async () => {
+  Date.now = () => 2_000_000_000
+  const db = new MemoryD1()
+  const oldSession = 'stratum-old-session'
+  const recentSession = 'stratum-recent-session'
+  db.sessions.set(oldSession, {
+    id: oldSession,
+    created_at: Date.now() - 45 * 24 * 60 * 60 * 1000,
+    last_active: Date.now() - 31 * 24 * 60 * 60 * 1000,
+    escalated: 0,
+    intake_complete: 0,
+  })
+  db.sessions.set(recentSession, {
+    id: recentSession,
+    created_at: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    last_active: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    escalated: 0,
+    intake_complete: 0,
+  })
+  db.messages.set('old-message', {
+    id: 'old-message',
+    session_id: oldSession,
+    role: 'user',
+    content: 'Expired conversation',
+    citations_json: null,
+    created_at: 1,
+  })
+  db.messages.set('recent-message', {
+    id: 'recent-message',
+    session_id: recentSession,
+    role: 'assistant',
+    content: 'Recent conversation',
+    citations_json: null,
+    created_at: 2,
+  })
+
+  const response = await sessions({
+    env: { STRATUM_DB: db, SESSION_SECRET: 'test-secret' },
+    request: new Request('https://edstratumlabs.ai/api/sessions/purge', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-secret',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ olderThanDays: 30 }),
+    }),
+    params: { route: ['purge'] },
+  } as never)
+
+  expect(response.status).toBe(200)
+  expect(await response.json()).toEqual({
+    ok: true,
+    olderThanDays: 30,
+    cutoff: Date.now() - 30 * 24 * 60 * 60 * 1000,
+  })
+  expect(db.sessions.has(oldSession)).toBe(false)
+  expect(db.sessions.has(recentSession)).toBe(true)
+  expect(db.messages.has('old-message')).toBe(false)
+  expect(db.messages.has('recent-message')).toBe(true)
+})
+
+test('POST /api/sessions/purge rejects scoped session tokens', async () => {
+  const { db, sessionToken } = await createPersistedSession()
+
+  const response = await sessions({
+    env: { STRATUM_DB: db, SESSION_SECRET: 'test-secret' },
+    request: new Request('https://edstratumlabs.ai/api/sessions/purge', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ olderThanDays: 30 }),
+    }),
+    params: { route: ['purge'] },
+  } as never)
+
+  expect(response.status).toBe(403)
+  expect(await response.json()).toEqual({ error: 'forbidden' })
 })
 
 test('session routes fail closed when D1 is unbound', async () => {

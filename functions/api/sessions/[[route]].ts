@@ -26,6 +26,9 @@ interface MessageInput {
 
 const MAX_CONTENT_LENGTH = 16_000
 const SESSION_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/
+const DEFAULT_PURGE_OLDER_THAN_DAYS = 30
+const MAX_PURGE_OLDER_THAN_DAYS = 365
+const DAY_MS = 24 * 60 * 60 * 1000
 
 function routeParts(param: RouteParam) {
   if (Array.isArray(param)) {
@@ -188,6 +191,24 @@ function messagesFromBody(body: unknown) {
   return messages.every(Boolean) ? messages as StoredMessage[] : null
 }
 
+function purgeOlderThanDays(body: unknown): number | null {
+  if (!body || typeof body !== 'object') {
+    return DEFAULT_PURGE_OLDER_THAN_DAYS
+  }
+
+  const value = (body as { olderThanDays?: unknown }).olderThanDays
+  if (
+    typeof value !== 'number' ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > MAX_PURGE_OLDER_THAN_DAYS
+  ) {
+    return null
+  }
+
+  return value
+}
+
 function databaseUnavailable(env: Env) {
   if (!env.STRATUM_DB) {
     return jsonResponse({ error: 'd1_not_configured' }, { status: 503 })
@@ -195,6 +216,24 @@ function databaseUnavailable(env: Env) {
 
   if (!env.SESSION_SECRET) {
     return jsonResponse({ error: 'session_secret_not_configured' }, { status: 503 })
+  }
+
+  return null
+}
+
+function requireAdminAccess(request: Request, env: Env) {
+  const unavailable = databaseUnavailable(env)
+  if (unavailable) {
+    return unavailable
+  }
+
+  const token = bearerToken(request)
+  if (!token) {
+    return jsonResponse({ error: 'missing_authorization' }, { status: 401 })
+  }
+
+  if (!constantTimeEqual(token, env.SESSION_SECRET!)) {
+    return jsonResponse({ error: 'forbidden' }, { status: 403 })
   }
 
   return null
@@ -379,6 +418,55 @@ async function patchSession(request: Request, env: Env, sessionId: string) {
   return jsonResponse({ ok: true })
 }
 
+async function deleteSession(request: Request, env: Env, sessionId: string) {
+  const blocked = await requireSessionAccess(request, env, sessionId)
+  if (blocked) {
+    return blocked
+  }
+
+  if (!(await sessionExists(env.STRATUM_DB!, sessionId))) {
+    return jsonResponse({ error: 'session_not_found' }, { status: 404 })
+  }
+
+  await env.STRATUM_DB!.prepare('DELETE FROM messages WHERE session_id = ?')
+    .bind(sessionId)
+    .run()
+  await env.STRATUM_DB!.prepare('DELETE FROM sessions WHERE id = ?')
+    .bind(sessionId)
+    .run()
+
+  return jsonResponse({ ok: true })
+}
+
+async function purgeOldSessions(request: Request, env: Env) {
+  const blocked = requireAdminAccess(request, env)
+  if (blocked) {
+    return blocked
+  }
+
+  const body = await readJson(request)
+  if (body === undefined) {
+    return jsonResponse({ error: 'invalid_json' }, { status: 400 })
+  }
+
+  const olderThanDays = purgeOlderThanDays(body)
+  if (!olderThanDays) {
+    return jsonResponse({ error: 'invalid_retention_window' }, { status: 400 })
+  }
+
+  const cutoff = Date.now() - olderThanDays * DAY_MS
+  await env.STRATUM_DB!.prepare(
+    'DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE last_active < ?)',
+  )
+    .bind(cutoff)
+    .run()
+  await env.STRATUM_DB!.prepare('DELETE FROM sessions WHERE last_active < ?')
+    .bind(cutoff)
+    .run()
+
+  return jsonResponse({ ok: true, olderThanDays, cutoff })
+}
+
 export const onRequest: PagesFunction<Env, string, SessionParams> = async ({
   env,
   params,
@@ -389,6 +477,10 @@ export const onRequest: PagesFunction<Env, string, SessionParams> = async ({
 
   if (method === 'POST' && parts.length === 0) {
     return createSession(env)
+  }
+
+  if (method === 'POST' && parts.length === 1 && parts[0] === 'purge') {
+    return purgeOldSessions(request, env)
   }
 
   if (parts.length === 2 && parts[1] === 'messages') {
@@ -403,6 +495,10 @@ export const onRequest: PagesFunction<Env, string, SessionParams> = async ({
 
   if (parts.length === 1 && method === 'PATCH') {
     return patchSession(request, env, parts[0])
+  }
+
+  if (parts.length === 1 && method === 'DELETE') {
+    return deleteSession(request, env, parts[0])
   }
 
   return jsonResponse({ error: 'not_found' }, { status: 404 })

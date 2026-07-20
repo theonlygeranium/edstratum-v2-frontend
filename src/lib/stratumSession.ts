@@ -119,6 +119,22 @@ export function clearPersistentSession() {
   safeRemove(window.localStorage, STRATUM_SESSION_TOKEN_KEY)
 }
 
+export async function deletePersistentSession(sessionId?: string): Promise<void> {
+  const session = persistentSession()
+  if (!session || (sessionId && session.sessionId !== sessionId)) {
+    return
+  }
+
+  try {
+    await fetch(`/api/sessions/${encodeURIComponent(session.sessionId)}`, {
+      method: 'DELETE',
+      headers: authHeaders(session.sessionToken),
+    })
+  } catch {
+    // Persistence cleanup is best-effort and must never block transcript reset.
+  }
+}
+
 export async function initializePersistentSession(): Promise<PersistentSession | null> {
   const current = persistentSession()
   if (current) {

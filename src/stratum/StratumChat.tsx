@@ -5,6 +5,7 @@ import { transitions } from '../lib/motionVariants'
 import { detectSentiment, type SentimentSignal } from '../lib/sentimentSignal'
 import {
   clearPersistentSession,
+  deletePersistentSession,
   getOrCreateSessionId,
   initializePersistentSession,
   loadMessagesFromBackend,
@@ -476,6 +477,7 @@ export default function StratumChat() {
     lastEscalationAtRef.current = null
     setActivePhases([])
     if (runtimeConfig.persistenceEnabled) {
+      void deletePersistentSession()
       clearPersistentSession()
       void initializePersistentSession().then((session) => {
         if (session) {
