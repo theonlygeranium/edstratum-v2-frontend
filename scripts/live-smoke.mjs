@@ -218,11 +218,14 @@ async function main() {
   const analyticsResult = await readJson('/api/analytics', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      event: 'chat_open',
-      sessionId: `live-smoke-${Date.now()}`,
-      properties: { source: 'live-smoke' },
-    }),
+    body: JSON.stringify([
+      {
+        event: 'chatbot_opened',
+        session: `live-smoke-${Date.now()}`,
+        ts: Date.now(),
+        properties: {},
+      },
+    ]),
   })
   if (expected.analyticsEnabled) {
     expect(analyticsResult.response.status === 202, '/api/analytics accepts allowlisted event')

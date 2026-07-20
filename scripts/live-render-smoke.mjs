@@ -102,10 +102,19 @@ function attachDiagnostics(page) {
     if (!['document', 'script', 'stylesheet', 'xhr', 'fetch'].includes(resourceType)) {
       return
     }
+    const failureText = request.failure()?.errorText || 'unknown failure'
+    if (
+      resourceType === 'fetch' &&
+      request.method() === 'POST' &&
+      request.url().startsWith(`${frontendUrl}/api/chat`) &&
+      /net::ERR_ABORTED/i.test(failureText)
+    ) {
+      return
+    }
 
     diagnostics.push({
       type: `requestfailed.${resourceType}`,
-      text: `${request.method()} ${request.url()} - ${request.failure()?.errorText || 'unknown failure'}`,
+      text: `${request.method()} ${request.url()} - ${failureText}`,
     })
   })
 
