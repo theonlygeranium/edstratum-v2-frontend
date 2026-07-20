@@ -39,6 +39,7 @@ EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live:rendere
 npm run qa:activation
 npm run qa:activation -- --profile persistence --plan
 npm run qa:activation -- --profile voice --runtime-config-json
+npm run qa:activation -- --profile edge-voice --plan
 npm run qa:activation -- --profile full-activation
 npm run qa:activation -- --profile full-activation --plan
 ```
@@ -62,9 +63,11 @@ The activation readiness audit is safe for production by default. It checks the
 source-controlled Cloudflare binding names, public `/api/config`, a zero-event
 analytics probe, an auth-gated D1 sessions probe, fail-closed or validation-only
 TTS behavior, and backend runtime providers. Use `--profile current`,
-`analytics`, `managed-rag`, `persistence`, `voice`, or `full-activation` to make
-the intended rollout state explicit. Use `--plan` to print the non-secret
-Cloudflare/Railway activation checklist for that profile, or
+`analytics`, `managed-rag`, `persistence`, `voice`, `edge-voice`, or
+`full-activation` to make the intended rollout state explicit. `edge-voice`
+covers the Cloudflare KV/D1/rate/analytics, persistence, and voice/TTS rollout
+while keeping managed RAG on the current hash/Chroma runtime. Use `--plan` to
+print the non-secret Cloudflare/Railway activation checklist for that profile, or
 `--runtime-config-json` to print only the JSON intended for the `STRATUM_CONFIG`
 key named `runtime`. Add `--probe-analytics-write` only after binding
 `ANALYTICS_EVENTS`, because it writes one synthetic allowlisted analytics event.

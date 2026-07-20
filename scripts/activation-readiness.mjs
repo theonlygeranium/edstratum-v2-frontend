@@ -93,6 +93,24 @@ const PROFILE_TARGETS = {
     },
     backendTtsStatus: 'ok',
   },
+  'edge-voice': {
+    analyticsEnabled: true,
+    rateLimitEnabled: true,
+    frontendFlags: {
+      ragEnabled: true,
+      voiceEnabled: true,
+      persistenceEnabled: true,
+      maxIntakeQuestions: 7,
+    },
+    backendRuntime: {
+      graph_runtime: 'langgraph',
+      session_store_backend: 'postgres',
+      embedding_provider: 'hash',
+      vector_store_provider: 'chroma',
+      llm_provider: 'writer',
+    },
+    backendTtsStatus: 'ok',
+  },
   'full-activation': {
     analyticsEnabled: true,
     rateLimitEnabled: true,
@@ -174,6 +192,31 @@ const PROFILE_ROLLOUTS = {
       'The voice readiness probe uses an invalid validation-only body so successful routing proves the proxy without generating audio.',
     ],
   },
+  'edge-voice': {
+    cloudflare: [
+      'Bind KV namespace STRATUM_CONFIG.',
+      'Bind KV namespace RATE_LIMIT.',
+      'Bind KV namespace ANALYTICS_EVENTS.',
+      'Create D1 database stratum-conversations.',
+      'Run the checked-in D1 schema against stratum-conversations.',
+      'Bind D1 database as STRATUM_DB.',
+      'Set SESSION_SECRET in Cloudflare Pages environment variables.',
+      'Set Cloudflare Pages build-time variable VITE_TTS_ENABLED=true and redeploy the frontend.',
+      'Write the runtime config JSON below to STRATUM_CONFIG key runtime only after D1 and backend TTS are verified.',
+    ],
+    backend: [
+      'Set ELEVENLABS_API_KEY.',
+      'Optionally set ELEVENLABS_VOICE_ID.',
+      'Redeploy the backend and verify /api/health reports tts.status ok before enabling voiceEnabled.',
+    ],
+    notes: [
+      'This profile covers tasks 1-3 only: Cloudflare KV/D1/rate/analytics, persistence, and voice/TTS.',
+      'Managed RAG intentionally remains on hash/chroma here; use full-activation after OpenAI/Pinecone are configured.',
+      'Run with --probe-rate-limit after RATE_LIMIT is bound to prove the HTTP 429 enforcement path.',
+      'Run with --probe-analytics-write and --probe-persistence-write after ANALYTICS_EVENTS, STRATUM_DB, SESSION_SECRET, and runtime persistence are enabled to prove write paths.',
+      'Keep runtime flags off until dependent storage/provider checks pass; this avoids exposing half-configured voice or persistence UI.',
+    ],
+  },
   'full-activation': {
     cloudflare: [
       'Bind KV namespace STRATUM_CONFIG.',
@@ -208,6 +251,7 @@ const PROFILE_ROLLOUTS = {
 const BACKEND_AUDIT_PROFILE = {
   analytics: 'current',
   current: 'current',
+  'edge-voice': 'edge-voice',
   'full-activation': 'full-activation',
   'managed-rag': 'managed-rag',
   persistence: 'persistence',
@@ -242,7 +286,7 @@ function usage() {
   return `Usage: npm run qa:activation -- [options]
 
 Options:
-  --profile <name>       current, analytics, managed-rag, persistence, voice, full-activation
+  --profile <name>       current, analytics, managed-rag, persistence, voice, edge-voice, full-activation
   --frontend-url <url>   Frontend URL to inspect (default: ${DEFAULT_FRONTEND_URL})
   --backend-url <url>    Backend URL fallback when manifest has none
   --plan                 Print a non-secret rollout checklist for the profile
