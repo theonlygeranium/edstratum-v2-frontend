@@ -43,6 +43,12 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Enhancement spec Feature 1 citation UI delta is deployed: frontend `citations` SSE parsing, accessible expandable citation panels, representative mock citations, and `tests/rag.spec.ts`.
 - Production Cloudflare deployment for frontend commit `ec95e8b` succeeded, and live citation UI smoke passed against the Railway backend.
 
+## Feature 2 Branch Status
+
+- Branch `feat/escalation-email` adds escalation delivery parsing and user-visible success/failure system confirmations after backend handoff events.
+- Local branch QA passed on 2026-07-20: `npm run lint`, `npm run build`, and `npm test -- --reporter=list` (`42 passed`).
+- Production live escalation UI should not be clicked until backend suppression is verified on the deployed service or the user explicitly requests an email test.
+
 ## Recommended Next Steps
 
 1. Add/verify Cloudflare preview env var `VITE_STRATUM_API_URL` if preview branches should exercise the live backend instead of mock chat.
@@ -51,7 +57,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
    - chatbot opens on desktop and mobile
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
-3. Add a backend eval-only or staging header path for safe escalation QA without sending email.
+3. Merge and deploy Feature 2 after branch CI/preview pass, then verify backend suppression with `X-Stratum-QA` before any live escalation UI test.
 4. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
 5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.

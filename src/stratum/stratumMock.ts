@@ -1,5 +1,6 @@
 import { ESCALATION_REQUEST_TEXT, INTAKE_QUESTIONS } from './stratumConfig'
 import type {
+  EscalationDelivery,
   RagCitation,
   ReadinessSnapshot,
   SourceConfidence,
@@ -27,6 +28,26 @@ const MOCK_CITATIONS: RagCitation[] = [
 ]
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+function mockEscalationDelivery(): EscalationDelivery {
+  const shouldFail =
+    import.meta.env.VITE_MOCK_ESCALATION_FAIL === 'true' ||
+    window.localStorage.getItem('stratum_mock_escalation_fail') === 'true'
+
+  if (shouldFail) {
+    return {
+      success: false,
+      status: 'failed',
+      error: 'mock_failure',
+    }
+  }
+
+  return {
+    success: true,
+    status: 'sent',
+    messageId: 'mock-001',
+  }
+}
 
 function lastUserText(request: StratumStreamRequest) {
   return [...request.messages].reverse().find((message) => message.role === 'user')?.content ?? ''
@@ -58,6 +79,7 @@ function responseFor(request: StratumStreamRequest) {
         "Absolutely. I can connect you with EdStratum's Founding leadership team about the project.\n\n" +
         "I've prepared a summary for the Founding leadership team so the handoff has the right context.",
       escalate: 'explicit' as const,
+      escalation: mockEscalationDelivery(),
     }
   }
 
@@ -83,6 +105,10 @@ function responseFor(request: StratumStreamRequest) {
           `### Realistic First Step\n${snapshot.firstStep}`,
         snapshot,
         escalate: request.intakeAnswers.timeline === '30-60 days' ? ('high_intent' as const) : null,
+        escalation:
+          request.intakeAnswers.timeline === '30-60 days'
+            ? mockEscalationDelivery()
+            : null,
       }
     }
 
@@ -153,5 +179,6 @@ export async function* mockStreamResponse(
     type: 'done',
     snapshot: 'snapshot' in response ? response.snapshot ?? null : null,
     escalate: 'escalate' in response ? response.escalate ?? null : null,
+    escalation: 'escalation' in response ? response.escalation ?? null : null,
   }
 }

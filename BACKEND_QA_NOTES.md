@@ -87,3 +87,14 @@ When the Railway staging service is provisioned:
   - Railway public `/api/health` includes `rag: { status: "ok", vectorStoreConnected: true }`.
   - Live `/api/chat` SSE smoke returned HTTP 200, terminal `done`, and `3` citation rows with `X-Stratum-Eval: true`.
   - Live `https://edstratumlabs.ai` rendered the citation panel from the production backend and expanded excerpts successfully.
+
+## Branch Note — Escalation Email Safety
+
+**Updated:** 2026-07-20
+
+- Feature 2 is implemented on backend/frontend branch `feat/escalation-email`, pending merge and production deployment.
+- Backend branch adds structured escalation delivery metadata to terminal `done` SSE events, a safe `/api/escalate` contract route, HTML plus plaintext Resend payloads, session rate limiting, env aliases `ESCALATION_EMAIL_TO` / `ESCALATION_EMAIL_FROM`, and notification suppression for `X-Stratum-QA: true`, `X-Stratum-QA: suppress-notifications`, and `X-Stratum-Eval: true`.
+- Frontend branch consumes delivery metadata and renders success/failure system confirmations without sending any separate duplicate request.
+- Branch QA completed before merge:
+  - Backend: `./.venv/bin/pytest -q` -> `116 passed, 1 skipped`
+  - Frontend: `npm run lint`, `npm run build`, `npm test -- --reporter=list` -> `42 passed`

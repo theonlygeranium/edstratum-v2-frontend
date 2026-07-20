@@ -13,6 +13,7 @@ import { getSessionId, streamStratumResponse } from './stratumApi'
 import type {
   ChatMessage,
   ConversationMode,
+  EscalationDelivery,
   EscalationTrigger,
   ProcessingPhase,
   RagCitation,
@@ -46,6 +47,27 @@ function userMessage(content: string): ChatMessage {
     content,
     timestamp: Date.now(),
   }
+}
+
+function systemMessage(content: string): ChatMessage {
+  return {
+    id: createId('system'),
+    role: 'system',
+    content,
+    timestamp: Date.now(),
+  }
+}
+
+function escalationConfirmation(delivery: EscalationDelivery | null | undefined) {
+  if (delivery?.success) {
+    return 'A member of the EdStratum Labs team will reach out within one business day.'
+  }
+
+  if (delivery) {
+    return 'We encountered an issue. Please email hello@edstratumlabs.ai directly.'
+  }
+
+  return null
 }
 
 function questionText(index: number) {
@@ -354,6 +376,10 @@ export default function StratumChat() {
           }
           if (event.escalate) {
             trackEvent('escalation_triggered', { trigger: event.escalate })
+            const confirmation = escalationConfirmation(event.escalation)
+            if (confirmation) {
+              appendMessage(systemMessage(confirmation))
+            }
           }
         }
 
@@ -500,7 +526,7 @@ export default function StratumChat() {
               <button
                 type="button"
                 onClick={() => void submitText(ESCALATION_REQUEST_TEXT, 'escalation')}
-                disabled={pending}
+                disabled={pending || escalation !== null}
                 className="rounded-md px-2 py-1 text-xs font-semibold text-text-accent hover:bg-primary-dim disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Connect
@@ -534,21 +560,26 @@ export default function StratumChat() {
                     key={message.id}
                     className={[
                       'flex',
-                      message.role === 'user' ? 'justify-end' : 'justify-start',
+                      message.role === 'system'
+                        ? 'justify-center'
+                        : message.role === 'user'
+                          ? 'justify-end'
+                          : 'justify-start',
                     ].join(' ')}
                   >
                     <div
                       className={[
-                        'max-w-[82%] rounded-lg px-3.5 py-3 text-sm leading-relaxed',
                         'break-words [overflow-wrap:anywhere]',
                         message.role === 'user'
-                          ? 'bg-primary text-white'
-                          : 'border border-border bg-surface text-text-secondary',
+                          ? 'max-w-[82%] rounded-lg bg-primary px-3.5 py-3 text-sm leading-relaxed text-white'
+                          : message.role === 'system'
+                            ? 'max-w-[90%] rounded-full border border-primary/40 bg-primary-dim px-3 py-2 text-center text-xs font-semibold leading-snug text-text'
+                            : 'max-w-[82%] rounded-lg border border-border bg-surface px-3.5 py-3 text-sm leading-relaxed text-text-secondary',
                       ].join(' ')}
                     >
                       {message.content ? <MessageContent content={message.content} /> : <TypingDots />}
-                      {message.source ? <SourceBadge source={message.source} /> : null}
-                      {message.citations && message.citations.length > 0 ? (
+                      {message.role !== 'system' && message.source ? <SourceBadge source={message.source} /> : null}
+                      {message.role !== 'system' && message.citations && message.citations.length > 0 ? (
                         <CitationPanel citations={message.citations} />
                       ) : null}
                     </div>

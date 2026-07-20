@@ -15,6 +15,15 @@ export type EscalationTrigger =
   | 'sentiment'
   | null
 
+export type EscalationStatus = 'idle' | 'sending' | 'sent' | 'failed'
+
+export interface EscalationDelivery {
+  success: boolean
+  status: 'sent' | 'prepared' | 'failed' | 'rate_limited' | 'suppressed'
+  messageId?: string | null
+  error?: string | null
+}
+
 export interface SourceConfidence {
   label: string
   score: number
@@ -74,6 +83,7 @@ export type DoneEvent = {
   type: 'done'
   snapshot?: ReadinessSnapshot | null
   escalate?: EscalationTrigger
+  escalation?: EscalationDelivery | null
 }
 
 export type ErrorEvent = {

@@ -1,6 +1,7 @@
 import { STRATUM_API_URL, STRATUM_BACKEND_ENABLED, STRATUM_SESSION_KEY } from './stratumConfig'
 import { mockStreamResponse } from './stratumMock'
 import type {
+  EscalationDelivery,
   EscalationTrigger,
   ProcessingPhase,
   RagCitation,
@@ -24,6 +25,14 @@ const ESCALATION_TRIGGERS = new Set([
   'confidence',
   'high_intent',
   'sentiment',
+])
+
+const ESCALATION_DELIVERY_STATUSES = new Set([
+  'sent',
+  'prepared',
+  'failed',
+  'rate_limited',
+  'suppressed',
 ])
 
 function newSessionId() {
@@ -92,6 +101,28 @@ function normalizeEscalation(value: unknown): EscalationTrigger {
   return null
 }
 
+function normalizeEscalationDelivery(value: unknown): EscalationDelivery | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const delivery = value as Record<string, unknown>
+  if (
+    typeof delivery.success !== 'boolean' ||
+    typeof delivery.status !== 'string' ||
+    !ESCALATION_DELIVERY_STATUSES.has(delivery.status)
+  ) {
+    return null
+  }
+
+  return {
+    success: delivery.success,
+    status: delivery.status as EscalationDelivery['status'],
+    messageId: typeof delivery.messageId === 'string' ? delivery.messageId : null,
+    error: typeof delivery.error === 'string' ? delivery.error : null,
+  }
+}
+
 function normalizeStreamEvent(value: unknown): StreamEvent | null {
   if (!value || typeof value !== 'object') {
     return null
@@ -120,6 +151,7 @@ function normalizeStreamEvent(value: unknown): StreamEvent | null {
       type: 'done',
       snapshot: isReadinessSnapshot(event.snapshot) ? event.snapshot : null,
       escalate: normalizeEscalation(event.escalate),
+      escalation: normalizeEscalationDelivery(event.escalation),
     }
   }
 
