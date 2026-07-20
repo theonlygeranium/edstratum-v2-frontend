@@ -105,7 +105,7 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, and produ
 
 ## Current SOT Blockers
 
-- GitHub branch protection for frontend `main` is not configured to require `CI / build-and-test`; branch protection check returned unprotected with no required status checks.
+- GitHub branch protection for frontend `main` is not configured to require `CI / build-and-test`; branch protection check returned unprotected with no required status checks. A GitHub API attempt on 2026-07-20 returned HTTP 403 requiring GitHub Pro or a public repository before branch protection can be enabled.
 - Cloudflare KV rate limiting is not active in production. Live rapid `/api/config` probes did not return HTTP 429, and `_middleware.ts` skips enforcement until `RATE_LIMIT` is bound.
 - D1 persistence is not active in production. `/api/config` returns `persistenceEnabled: false`, and `/api/sessions/.../messages` returns `503` with `d1_not_configured`.
 - Voice/TTS is not active in production. `/api/config` returns `voiceEnabled: false`, and `/api/health` reports `tts.status: "unconfigured"`.
