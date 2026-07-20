@@ -5,21 +5,21 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production code-bearing commit verified: `a2a9551`
-- Latest verified code-bearing manifest commit: `a2a9551`; docs-only pushes can advance the manifest git SHA while leaving code-bearing asset hashes unchanged.
+- Latest frontend production code-bearing commit verified: `36f201f`
+- Latest verified code-bearing manifest commit: `36f201f`; docs-only pushes can advance the manifest git SHA while leaving code-bearing asset hashes unchanged.
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-y7cgbAE2.js`
+- Current production entry asset: `/assets/index-Cld5-OrE.js`
 - Current production stylesheet asset: `/assets/index-DH0EGGDC.css`
-- Current STRATUM chat asset: `/assets/StratumChat-YqNBO1Mg.js`
+- Current STRATUM chat asset: `/assets/StratumChat-5iN0axbq.js`
 - Current PDF snapshot assets: `/assets/stratumPDF-Bgc_chGe.js`, `/assets/pdf-vendor-B7fMFYQc.js`
 - Current public build manifest: `https://edstratumlabs.ai/build-manifest.json`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
-Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, and production rendering are healthy at code-bearing commit `a2a9551`, but the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence activation remain pending.
+Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser TTS streaming, public build manifest, QA suppression header gating, D1 deletion/retention primitives, TTS runtime fail-closed gating, microphone policy readiness, privacy-safe analytics source readiness, and production rendering are healthy at code-bearing commit `36f201f`, but the full build spec is not yet complete because live Cloudflare/Railway configuration and managed RAG/TTS/persistence/analytics activation remain pending.
 
 ## QA Completed
 
@@ -45,6 +45,7 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 - Public build manifest code-bearing commit `c5f6431` is deployed on production. Local QA passed on 2026-07-20: `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused STRATUM browser tests (`28 passed`), and full Playwright suite (`124 passed`). Hosted main CI `29733457960` passed with `124 passed`; Cloudflare Pages production succeeded; live `/build-manifest.json` returned HTTP 200 with `Cache-Control: public, max-age=60, must-revalidate`, backend URL `https://stratum-backend-production-a340.up.railway.app`, 13 assets, and a matching live chat-asset SHA-256 hash. Docs-only pushes can advance the manifest git SHA while leaving the code-bearing asset hashes unchanged.
 - QA suppression header and Functions CI gate commit `43ce52e` is deployed on production. Local QA passed on 2026-07-20: `npm run type-check`, `npm run lint`, a QA build with `VITE_STRATUM_QA=true` proving `X-Stratum-QA: true` is emitted for real-backend chat requests, a normal production build proving the production chat asset does not contain `X-Stratum-QA`, `npx wrangler pages functions build`, focused escalation/sentiment tests (`16 passed`), and the full Playwright suite (`124 passed`). Hosted main CI `29735401007` passed with `124 passed` and now includes `npx wrangler pages functions build`; Cloudflare Pages production succeeded; live `/build-manifest.json` returned commit `43ce52e`, 13 assets, chat asset `/assets/StratumChat-Dr5FwyGc.js`, and a matching live chat-asset SHA-256 hash.
 - Voice and persistence readiness commit `a2a9551` is deployed on production. It adds scoped `DELETE /api/sessions/:id`, admin-only `POST /api/sessions/purge` with a bounded retention window, reset-time persisted-session deletion, `idx_sessions_last_active`, same-origin microphone policy, and a same-origin `/api/tts` fail-closed gate unless runtime `voiceEnabled` is true. Local QA passed on 2026-07-20: `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused Functions tests (`42 passed`), focused persistence tests (`12 passed`), focused voice tests (`16 passed`), and full Playwright with one worker (`138 passed`). Hosted main CI `29736780944` passed with `138 passed`; live `/build-manifest.json` returned commit `a2a9551`, entry asset `/assets/index-y7cgbAE2.js`, chat asset `/assets/StratumChat-YqNBO1Mg.js`, 13 assets, and `Cache-Control: public, max-age=60, must-revalidate`. Live root headers include `Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=()`, and live `/api/tts` returns `503` with `detail: "tts_disabled"` while `voiceEnabled` is false.
+- Privacy-safe analytics commit `36f201f` is deployed on production. It adds typed and property-whitelisted STRATUM analytics events for chat open, first message, readiness completion, backend error, and handoff intent; a same-origin `/api/analytics` Pages Function that stores aggregate daily counters only when `ANALYTICS_EVENTS` is bound; and browser/Functions tests proving prompt text, intake answers, raw session IDs, and unsafe properties are not stored. Local QA passed on 2026-07-20: `npm run type-check`, `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused analytics Functions tests (`10 passed`), rendered analytics browser tests (`8 passed`), and full Playwright with one worker (`156 passed`). Hosted main CI `29738422278` passed with `156 passed`; live `/build-manifest.json` returned commit `36f201f`, entry asset `/assets/index-Cld5-OrE.js`, chat asset `/assets/StratumChat-5iN0axbq.js`, 13 assets, and `Cache-Control: public, max-age=60, must-revalidate`. Live `/api/analytics` currently returns `503` with `error: "analytics_not_configured"` and `Cache-Control: no-store` because the analytics KV binding is not active.
 
 ## Notes For Future Agents
 
@@ -62,7 +63,8 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 - D1 persistence is source-ready but inactive until Cloudflare D1 binding `STRATUM_DB`, env var `SESSION_SECRET`, schema execution, and KV runtime flag `persistenceEnabled: true` are configured. Source now includes scoped session deletion and admin retention purge primitives.
 - Voice/TTS is source-ready, including same-origin browser playback through MediaSource when supported, but inactive until Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, and runtime config `voiceEnabled: true` are configured. Same-origin `/api/tts` returns `tts_disabled` until runtime voice is enabled.
 - PDF snapshot generation is client-side and lazy-loaded from `src/lib/stratumPDF.tsx`; there is no server round-trip or Node `fs`/`path`/`crypto` import in the client source.
-- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/sessions`, `/api/escalate`, and `/api/tts`. The TTS player now targets same-origin `/api/tts` when voice playback is enabled.
+- Production same-origin Cloudflare Functions currently exist for `/api/config`, `/api/health`, `/api/sessions`, `/api/escalate`, `/api/tts`, and `/api/analytics`. The TTS player now targets same-origin `/api/tts` when voice playback is enabled.
+- Analytics is source-ready but inactive until the Cloudflare KV binding `ANALYTICS_EVENTS` exists. The browser analytics client emits only allowlisted event/property values, and the server stores aggregate daily counters rather than prompt text, intake answers, raw session IDs, or PII.
 - Frontend CI now runs `npx wrangler pages functions build` after `npm run build` so Pages Functions syntax errors fail before deployment.
 - Browser TTS playback streams `ReadableStream` chunks through MediaSource/Web Audio when supported, with the existing `arrayBuffer()` decode path kept as a fallback for unsupported browsers.
 - Public deployment metadata is available at `/build-manifest.json`. It intentionally includes only non-secret build data: git SHA, branch, build timestamp, backend URL, hashed asset paths, sizes, and SHA-256 hashes.
@@ -121,6 +123,7 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 
 - GitHub branch protection for frontend `main` is not configured to require `CI / build-and-test`; branch protection check returned unprotected with no required status checks. A GitHub API attempt on 2026-07-20 returned HTTP 403 requiring GitHub Pro or a public repository before branch protection can be enabled.
 - Cloudflare KV rate limiting is not active in production. Live rapid `/api/config` probes did not return HTTP 429, and `_middleware.ts` skips enforcement until `RATE_LIMIT` is bound.
+- Cloudflare analytics aggregation is not active in production. Live `/api/analytics` returns `503 analytics_not_configured` until `ANALYTICS_EVENTS` is bound.
 - D1 persistence is not active in production. `/api/config` returns `persistenceEnabled: false`, and `/api/sessions/.../messages` returns `503` with `d1_not_configured`.
 - Voice/TTS is not active in production. `/api/config` returns `voiceEnabled: false`, `/api/health` reports `tts.status: "unconfigured"`, and live same-origin `/api/tts` fails closed with `503 tts_disabled` while runtime voice is disabled.
 - Wrangler is unauthenticated in this shell, and no Cloudflare deploy/control-plane token is present, so KV/D1 bindings and Pages env vars cannot be created or verified from here.
@@ -140,5 +143,5 @@ Latest SOT gate status: frontend source, CI, same-origin proxy routes, browser T
 7. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
 8. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 9. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
-10. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
+10. Bind Cloudflare KV namespace `ANALYTICS_EVENTS` to activate the source-ready aggregate chatbot analytics counters, then verify `/api/analytics` returns `202` for an allowlisted test event.
 11. Keep `/build-manifest.json` as the first deploy verification check before deeper rendered QA on future frontend pushes.
