@@ -5,11 +5,13 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest source commit observed in production deployment metadata: `f6cc8b4`
+- Latest source commit observed in production deployment metadata: `ec95e8b`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
+- Current production entry asset: `/assets/index-BmMnKl08.js`
+- Current STRATUM chat asset: `/assets/StratumChat-DcniEbxZ.js`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
@@ -22,6 +24,8 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Live production domain loads the source-built entrypoint `/assets/index-BChwigZm.js`.
 - Live production chatbot successfully reaches Railway `/api/chat` with HTTP 200.
 - Live completed response contains discretion-safe escalation language using `Founding leadership team`.
+- Live production chatbot renders expandable RAG citation panels from backend `citations` SSE events.
+- Branch and production QA for RAG citations passed: local `npm run lint`, `npm run build`, `npm test -- --reporter=list` (`36 passed`), GitHub status `CI / build-and-test`, Cloudflare Pages production check, and live rendered smoke on `https://edstratumlabs.ai`.
 
 ## Notes For Future Agents
 
@@ -34,11 +38,10 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - CI posts commit status context `CI / build-and-test`; configure branch protection to require it before merges to `main`.
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 
-## In-Flight Feature Branch
+## Completed Feature 1
 
-- Branch `feat/rag-backend` is implementing the enhancement spec's citation UI delta: frontend `citations` SSE parsing, accessible expandable citation panels, representative mock citations, and `tests/rag.spec.ts`.
-- Local branch QA passed on 2026-07-20 with `npm run lint`, `npm run build`, and `npm test -- --reporter=list` (`36 passed`).
-- This is not production evidence until the feature branch is merged to `main`, frontend CI is green, Cloudflare production deploys, and live QA confirms the production bundle.
+- Enhancement spec Feature 1 citation UI delta is deployed: frontend `citations` SSE parsing, accessible expandable citation panels, representative mock citations, and `tests/rag.spec.ts`.
+- Production Cloudflare deployment for frontend commit `ec95e8b` succeeded, and live citation UI smoke passed against the Railway backend.
 
 ## Recommended Next Steps
 

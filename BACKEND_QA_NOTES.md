@@ -74,13 +74,16 @@ When the Railway staging service is provisioned:
 
 ---
 
-## Feature Branch Note — `feat/rag-backend`
+## Production Note — RAG Citations
 
 **Updated:** 2026-07-20
 
-- Backend branch `feat/rag-backend` adds a `citations` SSE event with `{ source, excerpt }` rows for grounded RAG answers, while preserving the existing `source` confidence event and terminal `done` event.
-- Frontend branch `feat/rag-backend` parses the new event, stores citations on assistant messages, renders an accessible expandable citation panel, and keeps mock mode representative.
-- Local QA completed on the branch:
+- Backend commit `cde0dbe` adds a `citations` SSE event with `{ source, excerpt }` rows for grounded RAG answers, while preserving the existing `source` confidence event and terminal `done` event.
+- Frontend commit `ec95e8b` parses the new event, stores citations on assistant messages, renders an accessible expandable citation panel, and keeps mock mode representative.
+- Local QA completed before merge:
   - Backend: `./.venv/bin/pytest -q` -> `112 passed, 1 skipped`
   - Frontend: `npm run lint`, `npm run build`, `npm test -- --reporter=list` -> `36 passed`
-- This note is branch status only. It does not prove production deployment until both repos are merged/deployed and live QA confirms the production bundle/backend event stream.
+- Production QA completed after merge:
+  - Railway public `/api/health` includes `rag: { status: "ok", vectorStoreConnected: true }`.
+  - Live `/api/chat` SSE smoke returned HTTP 200, terminal `done`, and `3` citation rows with `X-Stratum-Eval: true`.
+  - Live `https://edstratumlabs.ai` rendered the citation panel from the production backend and expanded excerpts successfully.
