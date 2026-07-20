@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
 
 jobs:
   build-and-test:
@@ -86,3 +90,20 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+      - name: Notify build status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure'
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state,
+              context: 'CI / build-and-test',
+              description: state === 'success'
+                ? 'Build and tests passed'
+                : 'Build or tests failed - do not merge'
+            })

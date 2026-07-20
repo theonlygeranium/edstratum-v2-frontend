@@ -31,6 +31,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Cloudflare Pages is connected to the private GitHub frontend repo.
 - Pushes to `main` automatically deploy production; pushes to feature branches create preview deployments.
 - Production has `VITE_STRATUM_API_URL` configured. Preview env vars were last verified as unset, so branch previews may use mock chat unless the backend URL is added to preview settings.
+- CI posts commit status context `CI / build-and-test`; configure branch protection to require it before merges to `main`.
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 
 ## Recommended Next Steps
@@ -42,7 +43,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
 3. Add a backend eval-only or staging header path for safe escalation QA without sending email.
-4. Add or maintain frontend CI that runs `npm ci`, `npm run build`, and forbidden-copy scans before deploy.
+4. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
 5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
 7. Improve the chat control accessibility with Escape-to-close, focus return, and optional transcript reset.
