@@ -41,7 +41,7 @@ export const STRATUM_BACKEND_ENABLED = STRATUM_API_URL.length > 0
 export const STRATUM_SESSION_KEY = 'stratum-session-id'
 
 export const VOICE_CONFIG = {
-  maxTTSCharsPerMessage: 500,
+  maxTTSCharsPerMessage: 2500,
   autoSubmitOnQuestion: true,
   ttsEnabledByDefault: false,
 } as const

@@ -378,7 +378,7 @@ test('markdown is stripped before text is sent to TTS', async ({ page }) => {
   })
   await expect.poll(() => ttsPayload?.text ?? '').toContain('Your Situation')
   expect(ttsPayload?.text).not.toMatch(/[#*_`]/)
-  expect(ttsPayload?.text?.length).toBeLessThanOrEqual(500)
+  expect(ttsPayload?.text?.length).toBeLessThanOrEqual(2500)
 })
 
 test('TTS streams audio through MediaSource when available', async ({ page }) => {
