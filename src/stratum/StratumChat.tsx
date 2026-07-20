@@ -12,12 +12,20 @@ import {
   updateSessionFlags,
 } from '../lib/stratumSession'
 import { trackEvent } from '../lib/stratumAnalytics'
+import { TTSPlayer, ttsFeatureFlagEnabled } from '../lib/ttsPlayer'
+import {
+  createVoiceInputController,
+  type VoiceInputController,
+  type VoiceInputStatus,
+} from '../lib/voiceInput'
 import {
   ESCALATION_REQUEST_TEXT,
   INITIAL_GREETING,
   INTAKE_QUESTIONS,
   PHASE_LABELS,
   PROMPT_CHIPS,
+  STRATUM_API_URL,
+  VOICE_CONFIG,
 } from './stratumConfig'
 import { getStratumConfig, streamStratumResponse } from './stratumApi'
 import { sentimentTestMode } from './stratumMock'
@@ -46,6 +54,8 @@ type StreamAssistantOptions = {
   escalationTrigger?: Exclude<EscalationTrigger, null>
   sentimentSignal?: SentimentEscalationSignal
 }
+
+type SubmitText = (text: string, forcedMode?: ConversationMode) => Promise<void>
 
 function createId(prefix: string) {
   if (window.crypto?.randomUUID) {
@@ -103,6 +113,15 @@ function questionText(index: number) {
 
   const options = question.options.length > 0 ? `\n\nOptions: ${question.options.join(' / ')}` : ''
   return `${question.text}${options}`
+}
+
+function shouldAutoSubmitVoiceTranscript(text: string) {
+  if (!VOICE_CONFIG.autoSubmitOnQuestion) {
+    return false
+  }
+
+  const clean = text.trim()
+  return clean.endsWith('?') || clean.split(/\s+/).filter(Boolean).length > 20
 }
 
 function MessageContent({ content }: { content: string }) {
@@ -255,15 +274,26 @@ export default function StratumChat() {
   const [sentimentEscalationFired, setSentimentEscalationFired] = useState(false)
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(DEFAULT_RUNTIME_CONFIG)
   const [sessionId, setSessionId] = useState(() => getOrCreateSessionId())
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>('idle')
+  const [voiceAnnouncement, setVoiceAnnouncement] = useState('')
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(VOICE_CONFIG.ttsEnabledByDefault)
   const messagesRef = useRef(messages)
   const lastSentimentSignalRef = useRef<SentimentSignal>('neutral')
   const lastEscalationAtRef = useRef<number | null>(null)
   const persistenceHydratedRef = useRef(false)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const submitTextRef = useRef<SubmitText>(async () => undefined)
+  const voiceInputRef = useRef<VoiceInputController | null>(null)
+  const ttsPlayerRef = useRef<TTSPlayer | null>(null)
   // Accessibility: refs for focus management
   const triggerRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const voiceFeatureEnabled = runtimeConfig.voiceEnabled
+  const showVoiceInput = voiceFeatureEnabled && voiceSupported
+  const showTTSControls = voiceFeatureEnabled && ttsFeatureFlagEnabled()
 
   useEffect(() => {
     messagesRef.current = messages
@@ -311,6 +341,67 @@ export default function StratumChat() {
   }, [runtimeConfig.persistenceEnabled])
 
   useEffect(() => {
+    const controller = createVoiceInputController()
+    voiceInputRef.current = controller
+    setVoiceSupported(controller.isSupported)
+
+    controller.onStatusChange = (status) => {
+      setVoiceStatus(status)
+      if (status === 'listening') {
+        setVoiceAnnouncement('Listening for voice input.')
+      } else if (status === 'processing') {
+        setVoiceAnnouncement('Processing voice input.')
+      }
+    }
+    controller.onTranscript = (transcript) => {
+      setInput(transcript)
+    }
+    controller.onFinalTranscript = (transcript) => {
+      setInput(transcript)
+      setVoiceAnnouncement('Voice input captured.')
+      if (shouldAutoSubmitVoiceTranscript(transcript)) {
+        window.setTimeout(() => {
+          void submitTextRef.current(transcript)
+        }, 0)
+      }
+    }
+    controller.onError = () => {
+      setVoiceStatus('idle')
+      setVoiceAnnouncement('Voice input is unavailable.')
+    }
+
+    return () => {
+      controller.stop()
+      if (voiceInputRef.current === controller) {
+        voiceInputRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showTTSControls) {
+      ttsPlayerRef.current?.stop()
+      ttsPlayerRef.current = null
+      setTtsEnabled(false)
+      return
+    }
+
+    const player = new TTSPlayer({
+      apiBaseUrl: STRATUM_API_URL,
+      sessionId: () => sessionId,
+    })
+    ttsPlayerRef.current = player
+    setTtsEnabled(player.isEnabled)
+
+    return () => {
+      player.stop()
+      if (ttsPlayerRef.current === player) {
+        ttsPlayerRef.current = null
+      }
+    }
+  }, [sessionId, showTTSControls])
+
+  useEffect(() => {
     scrollerRef.current?.scrollTo({
       top: scrollerRef.current.scrollHeight,
       behavior: 'smooth',
@@ -345,6 +436,7 @@ export default function StratumChat() {
 
   // Accessibility: close helper — returns focus to trigger button
   function closeChat() {
+    voiceInputRef.current?.stop()
     setOpen(false)
     window.setTimeout(() => triggerRef.current?.focus(), 50)
   }
@@ -353,6 +445,8 @@ export default function StratumChat() {
   function resetTranscript() {
     abortRef.current?.abort()
     abortRef.current = null
+    voiceInputRef.current?.stop()
+    ttsPlayerRef.current?.stop()
     setPending(false)
     setMessages([assistantMessage(INITIAL_GREETING)])
     setMode('open')
@@ -375,6 +469,15 @@ export default function StratumChat() {
     trackEvent('transcript_reset')
     // Return focus to input after reset
     window.setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  function speakAssistantMessage(content: string) {
+    const player = ttsPlayerRef.current
+    if (!showTTSControls || !player?.isEnabled) {
+      return
+    }
+
+    void player.speak(content)
   }
 
   function persistMessage(message: ChatMessage) {
@@ -556,6 +659,7 @@ export default function StratumChat() {
             }
           }
           persistAssistantDraft()
+          speakAssistantMessage(assistantDraft.content)
         }
 
         if (event.type === 'error') {
@@ -644,6 +748,8 @@ export default function StratumChat() {
     await streamAssistantResponse(requestMode, requestMessages, null, intakeAnswers)
   }
 
+  submitTextRef.current = submitText
+
   function handlePrompt(label: string, promptMode: ConversationMode) {
     trackEvent('prompt_chip_clicked', { chip: label })
     if (promptMode === 'intake') {
@@ -658,6 +764,30 @@ export default function StratumChat() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     void submitText(input)
+  }
+
+  function handleVoiceInput() {
+    const controller = voiceInputRef.current
+    if (!controller) {
+      return
+    }
+
+    if (voiceStatus === 'listening') {
+      controller.stop()
+      return
+    }
+
+    setVoiceAnnouncement('')
+    controller.start()
+  }
+
+  function handleTTSToggle() {
+    const player = ttsPlayerRef.current
+    if (!player) {
+      return
+    }
+
+    setTtsEnabled(player.toggle())
   }
 
   function handleOpen() {
@@ -725,6 +855,22 @@ export default function StratumChat() {
               >
                 Connect
               </button>
+              {showTTSControls ? (
+                <button
+                  type="button"
+                  onClick={handleTTSToggle}
+                  aria-pressed={ttsEnabled}
+                  aria-label={ttsEnabled ? 'Disable voice playback' : 'Enable voice playback'}
+                  className={[
+                    'rounded-md px-2 py-1 text-xs font-semibold',
+                    ttsEnabled
+                      ? 'bg-primary-dim text-text-accent'
+                      : 'text-text-muted hover:bg-surface-raised hover:text-text',
+                  ].join(' ')}
+                >
+                  {ttsEnabled ? 'Voice on' : 'Voice'}
+                </button>
+              ) : null}
               {/* Accessibility: transcript reset button */}
               <button
                 type="button"
@@ -807,6 +953,7 @@ export default function StratumChat() {
             <PhaseRail phases={activePhases} />
             {snapshot ? <SnapshotPanel snapshot={snapshot} /> : null}
             {escalation ? <EscalationPanel trigger={escalation} /> : null}
+            <span className="sr-only" aria-live="polite">{voiceAnnouncement}</span>
 
             <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border bg-surface p-3">
               <input
@@ -822,6 +969,24 @@ export default function StratumChat() {
                   'disabled:cursor-not-allowed disabled:opacity-60',
                 ].join(' ')}
               />
+              {showVoiceInput ? (
+                <button
+                  type="button"
+                  onClick={handleVoiceInput}
+                  disabled={pending && voiceStatus !== 'listening'}
+                  aria-pressed={voiceStatus === 'listening'}
+                  aria-label={voiceStatus === 'listening' ? 'Stop voice input' : 'Start voice input'}
+                  className={[
+                    'rounded-md border border-border px-3 py-2 text-sm font-semibold',
+                    voiceStatus === 'listening'
+                      ? 'border-primary/60 bg-primary-dim text-text-accent'
+                      : 'bg-background text-text-secondary hover:border-primary/50 hover:bg-surface-raised',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  ].join(' ')}
+                >
+                  {voiceStatus === 'listening' ? 'Stop' : 'Mic'}
+                </button>
+              ) : null}
               <button
                 type="submit"
                 disabled={pending || input.trim().length === 0}

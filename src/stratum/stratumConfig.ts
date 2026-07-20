@@ -17,6 +17,12 @@ export const STRATUM_API_URL = rawApiUrl.replace(/\/+$/, '')
 export const STRATUM_BACKEND_ENABLED = STRATUM_API_URL.length > 0
 export const STRATUM_SESSION_KEY = 'stratum-session-id'
 
+export const VOICE_CONFIG = {
+  maxTTSCharsPerMessage: 500,
+  autoSubmitOnQuestion: true,
+  ttsEnabledByDefault: false,
+} as const
+
 export const INITIAL_GREETING =
   "Hi, I'm STRATUM - EdStratum's AI intake advisor. I can help you figure out whether an AI engagement makes sense for your situation. Ask me anything about our services, or run a quick readiness check."
 
