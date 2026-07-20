@@ -888,6 +888,7 @@ export default function StratumChat() {
         whileTap={{ scale: 0.97 }}
         transition={transitions.snapSpring}
         onClick={handleOpen}
+        data-stratum-trigger="open"
         className={[
           'fixed bottom-5 right-5 z-[70] flex items-center gap-3 rounded-lg',
           'border border-border-bright bg-surface px-4 py-3 text-left shadow-2xl',

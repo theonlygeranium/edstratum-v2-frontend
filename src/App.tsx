@@ -132,7 +132,10 @@ export default function App() {
           </script>
         </Helmet>
 
-        <div className="min-h-screen bg-background text-text antialiased">
+        <div
+          data-app-shell="edstratum-labs"
+          className="min-h-screen bg-background text-text antialiased"
+        >
 
           {/* Critical path — no Suspense boundary needed */}
           <Navbar />
