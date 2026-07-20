@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest production code commit verified by live bundle: `371f634`
+- Latest frontend production code commit verified: `2f95db5`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
@@ -27,6 +27,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Live production chatbot renders expandable RAG citation panels from backend `citations` SSE events.
 - Branch and production QA for RAG citations passed: local `npm run lint`, `npm run build`, `npm test -- --reporter=list` (`36 passed`), GitHub status `CI / build-and-test`, Cloudflare Pages production check, and live rendered smoke on `https://edstratumlabs.ai`.
 - Feature 2 escalation delivery UI is deployed. Local, branch, and production CI passed with `42` Playwright tests; live backend suppression endpoints passed; live rendered QA verified a real non-escalation backend chat and intercepted escalation success/failure confirmations without sending email.
+- Feature 3 Cloudflare Pages Functions middleware is deployed. Local, branch, and production CI passed with `54` Playwright tests; live `/api/config` and `/api/health` returned HTTP 200 with cache headers from Cloudflare Pages Functions.
 
 ## Notes For Future Agents
 
@@ -51,10 +52,11 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Frontend commits `5955dff` and `371f634` are deployed on Cloudflare Pages production. `371f634` adds a production-host backend fallback for `edstratumlabs.ai` / `www.edstratumlabs.ai` while localhost and branch previews remain mock-mode by default.
 - Live rendered QA on 2026-07-20 verified the production site made one real non-escalation backend request for a RAG chat, displayed citations, and rendered escalation success/failure confirmations through intercepted SSE only, so no live handoff email was sent.
 
-## Feature 3 Branch Status
+## Completed Feature 3
 
-- Branch `feat/cf-functions` adds Cloudflare Pages Functions for `/api/health`, `/api/config`, and best-effort API rate limiting when KV bindings are available.
-- Local branch QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, `npm test -- --reporter=list` (`54 passed`), plus `wrangler pages dev dist --port 8788` smoke for `/api/config` and `/api/health`.
+- Enhancement spec Feature 3 is deployed: Cloudflare Pages Functions for `/api/health`, `/api/config`, and best-effort API rate limiting when KV bindings are available.
+- Frontend commit `2f95db5` is deployed on Cloudflare Pages production.
+- Local, preview, and production QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, `npm test -- --reporter=list` (`54 passed`), `wrangler pages dev dist --port 8788` smoke for `/api/config` and `/api/health`, Cloudflare preview Functions smoke, and production Functions smoke.
 - Wrangler is not authenticated in this shell, so KV namespace creation and dashboard binding remain pending: `STRATUM_CONFIG` and `RATE_LIMIT`.
 - Until KV is bound, `/api/config` returns safe default runtime flags and `_middleware.ts` skips rate limiting.
 
