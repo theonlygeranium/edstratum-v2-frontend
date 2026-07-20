@@ -18,6 +18,7 @@ import type {
   ReadinessSnapshot,
   SourceConfidence,
 } from './stratumTypes'
+import { trackEvent } from '../lib/stratumAnalytics'
 
 function createId(prefix: string) {
   if (window.crypto?.randomUUID) {
@@ -170,6 +171,9 @@ export default function StratumChat() {
   const messagesRef = useRef(messages)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Accessibility: refs for focus management
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -182,9 +186,54 @@ export default function StratumChat() {
     })
   }, [messages, activePhases, snapshot, escalation])
 
+  // Abort any in-flight stream on unmount
   useEffect(() => {
     return () => abortRef.current?.abort()
   }, [])
+
+  // Accessibility: Escape key closes the dialog and returns focus to trigger
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        closeChat()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Accessibility: move focus into input when dialog opens
+  useEffect(() => {
+    if (open) {
+      const id = window.setTimeout(() => inputRef.current?.focus(), 80)
+      return () => window.clearTimeout(id)
+    }
+  }, [open])
+
+  // Accessibility: close helper — returns focus to trigger button
+  function closeChat() {
+    setOpen(false)
+    window.setTimeout(() => triggerRef.current?.focus(), 50)
+  }
+
+  // Accessibility: transcript reset — clears state back to initial greeting
+  function resetTranscript() {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setPending(false)
+    setMessages([assistantMessage(INITIAL_GREETING)])
+    setMode('open')
+    setIntakeIndex(0)
+    setIntakeAnswers({})
+    setSnapshot(null)
+    setEscalation(null)
+    setActivePhases([])
+    trackEvent('transcript_reset')
+    // Return focus to input after reset
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }
 
   const appendMessage = (message: ChatMessage) => {
     setMessages((current) => [...current, message])
@@ -259,6 +308,12 @@ export default function StratumChat() {
           setActivePhases([])
           setSnapshot(event.snapshot ?? null)
           setEscalation(event.escalate ?? null)
+          if (event.snapshot) {
+            trackEvent('intake_completed')
+          }
+          if (event.escalate) {
+            trackEvent('escalation_triggered', { trigger: event.escalate })
+          }
         }
 
         if (event.type === 'error') {
@@ -329,6 +384,7 @@ export default function StratumChat() {
   }
 
   function handlePrompt(label: string, promptMode: ConversationMode) {
+    trackEvent('prompt_chip_clicked', { chip: label })
     if (promptMode === 'intake') {
       startIntake()
       return
@@ -343,16 +399,22 @@ export default function StratumChat() {
     void submitText(input)
   }
 
+  function handleOpen() {
+    setOpen(true)
+    trackEvent('chatbot_opened')
+  }
+
   const showPromptChips = messages.length === 1 && !pending
 
   return (
     <>
       <m.button
+        ref={triggerRef}
         type="button"
         whileHover={{ scale: 1.03, y: -1 }}
         whileTap={{ scale: 0.97 }}
         transition={transitions.snapSpring}
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className={[
           'fixed bottom-5 right-5 z-[70] flex items-center gap-3 rounded-lg',
           'border border-border-bright bg-surface px-4 py-3 text-left shadow-2xl',
@@ -361,6 +423,7 @@ export default function StratumChat() {
         ].join(' ')}
         aria-label="Open STRATUM chat"
         aria-expanded={open}
+        aria-haspopup="dialog"
       >
         <LogoMark />
         <span className="hidden sm:block">
@@ -378,6 +441,7 @@ export default function StratumChat() {
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={transitions.enter}
             role="dialog"
+            aria-modal="true"
             aria-label="STRATUM AI Intake Advisor"
             className={[
               'fixed bottom-3 left-3 right-3 z-[70] flex flex-col overflow-hidden rounded-lg',
@@ -400,13 +464,25 @@ export default function StratumChat() {
               >
                 Connect
               </button>
+              {/* Accessibility: transcript reset button */}
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-md px-2 py-1 text-sm font-semibold text-text-muted hover:bg-surface-raised hover:text-text"
-                aria-label="Close STRATUM chat"
+                onClick={resetTranscript}
+                disabled={pending}
+                title="Clear conversation"
+                aria-label="Clear conversation and start over"
+                className="rounded-md px-2 py-1 text-sm text-text-muted hover:bg-surface-raised hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
               >
-                X
+                ↺
+              </button>
+              {/* Accessibility: close button now calls closeChat() for focus return */}
+              <button
+                type="button"
+                onClick={closeChat}
+                className="rounded-md px-2 py-1 text-sm font-semibold text-text-muted hover:bg-surface-raised hover:text-text"
+                aria-label="Close STRATUM chat (Escape)"
+              >
+                ✕
               </button>
             </header>
 
@@ -465,6 +541,7 @@ export default function StratumChat() {
 
             <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border bg-surface p-3">
               <input
+                ref={inputRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 disabled={pending}
