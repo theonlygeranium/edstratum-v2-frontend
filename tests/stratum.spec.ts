@@ -75,7 +75,7 @@ async function completeSotReadinessFlow(page: Page) {
   await expect(dialog.getByText(/AI Readiness Snapshot/i)).toBeVisible({
     timeout: 15_000,
   })
-  await expect(dialog.getByText(/Relevant EdStratum Capabilities/i)).toBeVisible()
+  await expect(dialog.getByText('Relevant EdStratum Capabilities', { exact: true })).toBeVisible()
 }
 
 // ── Page load ────────────────────────────────────────────────────────────────
