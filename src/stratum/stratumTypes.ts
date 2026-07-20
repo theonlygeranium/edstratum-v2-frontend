@@ -8,6 +8,8 @@ export type ProcessingPhase =
 
 export type ConversationMode = 'open' | 'intake' | 'about' | 'escalation'
 
+export type ChatPhase = 'intake' | 'conversation' | 'complete' | 'escalated'
+
 export type EscalationTrigger =
   | 'explicit'
   | 'confidence'

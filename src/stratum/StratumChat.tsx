@@ -31,6 +31,7 @@ import { getStratumConfig, streamStratumResponse } from './stratumApi'
 import { sentimentTestMode } from './stratumMock'
 import type {
   ChatMessage,
+  ChatPhase,
   ConversationMode,
   EscalationDelivery,
   EscalationTrigger,
@@ -122,6 +123,17 @@ function shouldAutoSubmitVoiceTranscript(text: string) {
 
   const clean = text.trim()
   return clean.endsWith('?') || clean.split(/\s+/).filter(Boolean).length > 20
+}
+
+function intakeSummaryForPDF(intakeAnswers: Record<string, string>) {
+  return INTAKE_QUESTIONS.reduce<Record<string, string>>((summary, question) => {
+    const answer = intakeAnswers[question.id]
+    if (answer?.trim()) {
+      summary[question.text] = answer
+    }
+
+    return summary
+  }, {})
 }
 
 function MessageContent({ content }: { content: string }) {
@@ -266,6 +278,7 @@ export default function StratumChat() {
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
   const [mode, setMode] = useState<ConversationMode>('open')
+  const [chatPhase, setChatPhase] = useState<ChatPhase>('conversation')
   const [intakeIndex, setIntakeIndex] = useState(0)
   const [intakeAnswers, setIntakeAnswers] = useState<Record<string, string>>({})
   const [activePhases, setActivePhases] = useState<ProcessingPhase[]>([])
@@ -278,6 +291,7 @@ export default function StratumChat() {
   const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>('idle')
   const [voiceAnnouncement, setVoiceAnnouncement] = useState('')
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(VOICE_CONFIG.ttsEnabledByDefault)
+  const [pdfPending, setPdfPending] = useState(false)
   const messagesRef = useRef(messages)
   const lastSentimentSignalRef = useRef<SentimentSignal>('neutral')
   const lastEscalationAtRef = useRef<number | null>(null)
@@ -294,6 +308,7 @@ export default function StratumChat() {
   const voiceFeatureEnabled = runtimeConfig.voiceEnabled
   const showVoiceInput = voiceFeatureEnabled && voiceSupported
   const showTTSControls = voiceFeatureEnabled && ttsFeatureFlagEnabled()
+  const showDownloadSummary = chatPhase === 'complete' || chatPhase === 'escalated'
 
   useEffect(() => {
     messagesRef.current = messages
@@ -450,6 +465,7 @@ export default function StratumChat() {
     setPending(false)
     setMessages([assistantMessage(INITIAL_GREETING)])
     setMode('open')
+    setChatPhase('conversation')
     setIntakeIndex(0)
     setIntakeAnswers({})
     setSnapshot(null)
@@ -643,10 +659,12 @@ export default function StratumChat() {
           setSnapshot(event.snapshot ?? null)
           setEscalation(event.escalate ?? null)
           if (event.snapshot) {
+            setChatPhase('complete')
             trackEvent('intake_completed')
             persistSessionFlags({ intakeComplete: true })
           }
           if (event.escalate) {
+            setChatPhase('escalated')
             lastEscalationAtRef.current = Date.now()
             if (event.escalate === 'sentiment') {
               setSentimentEscalationFired(true)
@@ -694,6 +712,7 @@ export default function StratumChat() {
   function startIntake() {
     setOpen(true)
     setMode('intake')
+    setChatPhase('intake')
     setIntakeIndex(0)
     setIntakeAnswers({})
     setSnapshot(null)
@@ -788,6 +807,28 @@ export default function StratumChat() {
     }
 
     setTtsEnabled(player.toggle())
+  }
+
+  async function handleDownloadSummary() {
+    if (pdfPending) {
+      return
+    }
+
+    setPdfPending(true)
+    try {
+      const { downloadSessionPDF } = await import('../lib/stratumPDF')
+      await downloadSessionPDF({
+        messages: messagesRef.current,
+        intakeSummary: intakeSummaryForPDF(intakeAnswers),
+        sessionId,
+        generatedAt: new Date().toISOString(),
+      })
+      trackEvent('session_summary_downloaded', { phase: chatPhase })
+    } catch {
+      trackEvent('session_summary_download_failed', { phase: chatPhase })
+    } finally {
+      setPdfPending(false)
+    }
   }
 
   function handleOpen() {
@@ -953,6 +994,33 @@ export default function StratumChat() {
             <PhaseRail phases={activePhases} />
             {snapshot ? <SnapshotPanel snapshot={snapshot} /> : null}
             {escalation ? <EscalationPanel trigger={escalation} /> : null}
+            {showDownloadSummary ? (
+              <div className="mx-4 mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadSummary()}
+                  disabled={pdfPending}
+                  aria-label="Download session summary as PDF"
+                  className={[
+                    'inline-flex items-center gap-2 rounded-md border border-primary/50',
+                    'bg-primary-dim px-3 py-2 text-xs font-semibold text-text-accent',
+                    'hover:border-primary hover:bg-surface-raised disabled:cursor-wait disabled:opacity-70',
+                  ].join(' ')}
+                >
+                  {pdfPending ? (
+                    <>
+                      <span
+                        className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
+                        aria-hidden="true"
+                      />
+                      Preparing
+                    </>
+                  ) : (
+                    'Download Summary'
+                  )}
+                </button>
+              </div>
+            ) : null}
             <span className="sr-only" aria-live="polite">{voiceAnnouncement}</span>
 
             <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border bg-surface p-3">
