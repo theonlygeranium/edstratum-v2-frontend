@@ -246,6 +246,7 @@ export async function* streamStratumResponse(
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
     'Content-Type': 'application/json',
+    'X-Stratum-Session': request.sessionId || getSessionId(),
   }
   if (import.meta.env.VITE_STRATUM_QA === 'true') {
     headers['X-Stratum-QA'] = 'true'

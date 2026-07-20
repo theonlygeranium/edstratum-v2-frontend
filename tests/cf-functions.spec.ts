@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 
 import { onRequest as middleware } from '../functions/_middleware'
+import {
+  onRequestOptions as chatOptions,
+  onRequestPost as chat,
+} from '../functions/api/chat'
 import { onRequestGet as config } from '../functions/api/config'
 import { onRequestPost as escalate } from '../functions/api/escalate'
 import {
@@ -11,6 +15,7 @@ import {
 import { onRequestGet as health } from '../functions/api/health'
 import { onRequest as sessions } from '../functions/api/sessions/[[route]]'
 import { onRequestPost as tts } from '../functions/api/tts'
+import { stratumApiUrlForRuntime } from '../src/stratum/stratumConfig'
 
 class MemoryKV {
   private values = new Map<string, string>()
@@ -548,6 +553,116 @@ test('cached health response has Cache-Control header', async () => {
   } as never)
 
   expect(response.headers.get('Cache-Control')).toBe('public, max-age=30')
+})
+
+test('production chat runtime uses same-origin API surface', () => {
+  expect(
+    stratumApiUrlForRuntime('https://railway.example/', {
+      hostname: 'edstratumlabs.ai',
+      origin: 'https://edstratumlabs.ai',
+    }),
+  ).toBe('https://edstratumlabs.ai')
+  expect(
+    stratumApiUrlForRuntime('https://railway.example/', {
+      hostname: 'www.edstratumlabs.ai',
+      origin: 'https://www.edstratumlabs.ai',
+    }),
+  ).toBe('https://www.edstratumlabs.ai')
+  expect(
+    stratumApiUrlForRuntime('https://railway.example/', {
+      hostname: 'preview.edstratumlabs.pages.dev',
+      origin: 'https://preview.edstratumlabs.pages.dev',
+    }),
+  ).toBe('https://railway.example/')
+  expect(
+    stratumApiUrlForRuntime(undefined, {
+      hostname: 'localhost',
+      origin: 'http://localhost:4173',
+    }),
+  ).toBe('')
+})
+
+test('POST /api/chat streams Railway SSE and forwards safe QA headers', async () => {
+  const payload = {
+    messages: [],
+    mode: 'open',
+    intakeIndex: null,
+    intakeAnswers: {},
+    sessionId: 'session-chat',
+  }
+  let forwardedUrl = ''
+  let forwardedBody = ''
+  let forwardedHeaders = new Headers()
+
+  globalThis.fetch = async (input, init) => {
+    forwardedUrl = String(input)
+    forwardedBody = String(init?.body)
+    forwardedHeaders = new Headers(init?.headers)
+    return new Response('data: {"type":"done"}\n\n', {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+      },
+    })
+  }
+
+  const response = await chat({
+    env: { RAILWAY_API_URL: 'https://railway.example/' },
+    request: new Request('https://edstratumlabs.ai/api/chat', {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        'X-Stratum-Eval': 'true',
+        'X-Stratum-QA': 'true',
+        'X-Stratum-Session': 'session-chat',
+      },
+      body: JSON.stringify(payload),
+    }),
+  } as never)
+
+  expect(forwardedUrl).toBe('https://railway.example/api/chat')
+  expect(forwardedHeaders.get('Accept')).toBe('text/event-stream')
+  expect(forwardedHeaders.get('X-Stratum-Eval')).toBe('true')
+  expect(forwardedHeaders.get('X-Stratum-QA')).toBe('true')
+  expect(forwardedHeaders.get('X-Stratum-Session')).toBe('session-chat')
+  expect(JSON.parse(forwardedBody)).toEqual(payload)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Content-Type')).toBe('text/event-stream; charset=utf-8')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.text()).toBe('data: {"type":"done"}\n\n')
+})
+
+test('POST /api/chat fails closed when Railway is unavailable', async () => {
+  globalThis.fetch = async () => {
+    throw new Error('network unavailable')
+  }
+
+  const response = await chat({
+    env: { RAILWAY_API_URL: 'https://railway.example' },
+    request: new Request('https://edstratumlabs.ai/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+  } as never)
+
+  expect(response.status).toBe(502)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({ error: 'chat_proxy_unavailable' })
+})
+
+test('OPTIONS /api/chat returns no-store preflight response', async () => {
+  const response = await chatOptions({
+    env: {},
+    request: new Request('https://edstratumlabs.ai/api/chat', {
+      method: 'OPTIONS',
+    }),
+  } as never)
+
+  expect(response.status).toBe(204)
+  expect(response.headers.get('Allow')).toBe('POST, OPTIONS')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
 })
 
 test('POST /api/escalate proxies complete QA payload to Railway', async () => {
