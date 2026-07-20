@@ -16,12 +16,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 
 - `npm run build` passes with TypeScript and Vite.
 - Clean production build with `VITE_STRATUM_API_URL` emits `dist/assets/StratumChat-Cl3e2M0J.js`.
-- Source and built output scan clean for forbidden copy:
-  - `Jeffrey`
-  - `Jeff`
-  - `Calendly`
-  - `Talk to Jeffrey`
-  - `Book a discovery`
+- Source and built output scan clean for personal-name, direct-person CTA, and scheduling-link copy.
 - Local production preview in mock mode passes desktop and mobile chatbot open/respond checks.
 - Live production domain loads the source-built entrypoint `/assets/index-BChwigZm.js`.
 - Live production chatbot successfully reaches Railway `/api/chat` with HTTP 200.
@@ -46,6 +41,6 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 3. Add a backend eval-only or staging header path for safe escalation QA without sending email.
 4. Add a frontend CI workflow that runs `npm ci`, `npm run build`, and forbidden-copy scans before deploy.
 5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA.
-6. Once Calendly is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
+6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
 7. Improve the chat control accessibility with Escape-to-close, focus return, and optional transcript reset.
 8. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
