@@ -1,0 +1,6 @@
+# wrangler.toml — EdStratum Labs V2
+# KB4: pages_build_output_dir is correct for Cloudflare Pages
+# Do NOT use [site] bucket — that is the legacy Workers Sites format
+name = "edstratumlabs"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "./dist"
