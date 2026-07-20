@@ -8,6 +8,20 @@ import type {
   StreamEvent,
 } from './stratumTypes'
 
+declare global {
+  interface Window {
+    __STRATUM_LAST_MOCK_REQUEST__?: StratumStreamRequest
+  }
+}
+
+export const SENTIMENT_TEST_SEQUENCES = {
+  frustration: [
+    'This is not working for our Canvas pilot.',
+    'The guidance still feels useless.',
+  ],
+  urgency: ['We have a deadline today and need this now.'],
+} as const
+
 const MOCK_SOURCE: SourceConfidence = {
   label: 'EdStratum knowledge base',
   score: 0.86,
@@ -28,6 +42,18 @@ const MOCK_CITATIONS: RagCitation[] = [
 ]
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+export function sentimentTestMode() {
+  if (import.meta.env.VITE_SENTIMENT_TEST_MODE === 'true') {
+    return true
+  }
+
+  try {
+    return window.localStorage.getItem('stratum_sentiment_test_mode') === 'true'
+  } catch {
+    return false
+  }
+}
 
 function mockEscalationDelivery(): EscalationDelivery {
   const shouldFail =
@@ -73,12 +99,15 @@ function responseFor(request: StratumStreamRequest) {
   const text = lastUserText(request).toLowerCase()
 
   if (request.mode === 'escalation' || text.includes('founding leadership')) {
+    const trigger = request.escalationTrigger ?? 'explicit'
+    const isSentiment = trigger === 'sentiment'
     return {
       phases: ['escalating'] as const,
-      text:
-        "Absolutely. I can connect you with EdStratum's Founding leadership team about the project.\n\n" +
-        "I've prepared a summary for the Founding leadership team so the handoff has the right context.",
-      escalate: 'explicit' as const,
+      text: isSentiment
+        ? 'I am routing this to EdStratum\'s Founding leadership team with the context so it gets direct attention.'
+        : "Absolutely. I can connect you with EdStratum's Founding leadership team about the project.\n\n" +
+          "I've prepared a summary for the Founding leadership team so the handoff has the right context.",
+      escalate: trigger,
       escalation: mockEscalationDelivery(),
     }
   }
@@ -139,6 +168,10 @@ function responseFor(request: StratumStreamRequest) {
 export async function* mockStreamResponse(
   request: StratumStreamRequest,
 ): AsyncGenerator<StreamEvent> {
+  if (sentimentTestMode()) {
+    window.__STRATUM_LAST_MOCK_REQUEST__ = request
+  }
+
   const response = responseFor({
     ...request,
     messages:

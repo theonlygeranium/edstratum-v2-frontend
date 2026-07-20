@@ -2,6 +2,8 @@ import { AnimatePresence } from 'motion/react'
 import * as m from 'motion/react-m'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { transitions } from '../lib/motionVariants'
+import { detectSentiment, type SentimentSignal } from '../lib/sentimentSignal'
+import { trackEvent } from '../lib/stratumAnalytics'
 import {
   ESCALATION_REQUEST_TEXT,
   INITIAL_GREETING,
@@ -10,6 +12,7 @@ import {
   PROMPT_CHIPS,
 } from './stratumConfig'
 import { getSessionId, streamStratumResponse } from './stratumApi'
+import { sentimentTestMode } from './stratumMock'
 import type {
   ChatMessage,
   ConversationMode,
@@ -18,9 +21,16 @@ import type {
   ProcessingPhase,
   RagCitation,
   ReadinessSnapshot,
+  SentimentEscalationSignal,
   SourceConfidence,
 } from './stratumTypes'
-import { trackEvent } from '../lib/stratumAnalytics'
+
+const SENTIMENT_ESCALATION_COOLDOWN_MS = 10 * 60 * 1000
+
+type StreamAssistantOptions = {
+  escalationTrigger?: Exclude<EscalationTrigger, null>
+  sentimentSignal?: SentimentEscalationSignal
+}
 
 function createId(prefix: string) {
   if (window.crypto?.randomUUID) {
@@ -227,7 +237,10 @@ export default function StratumChat() {
   const [activePhases, setActivePhases] = useState<ProcessingPhase[]>([])
   const [snapshot, setSnapshot] = useState<ReadinessSnapshot | null>(null)
   const [escalation, setEscalation] = useState<Exclude<EscalationTrigger, null> | null>(null)
+  const [sentimentEscalationFired, setSentimentEscalationFired] = useState(false)
   const messagesRef = useRef(messages)
+  const lastSentimentSignalRef = useRef<SentimentSignal>('neutral')
+  const lastEscalationAtRef = useRef<number | null>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Accessibility: refs for focus management
@@ -288,6 +301,9 @@ export default function StratumChat() {
     setIntakeAnswers({})
     setSnapshot(null)
     setEscalation(null)
+    setSentimentEscalationFired(false)
+    lastSentimentSignalRef.current = 'neutral'
+    lastEscalationAtRef.current = null
     setActivePhases([])
     trackEvent('transcript_reset')
     // Return focus to input after reset
@@ -310,11 +326,59 @@ export default function StratumChat() {
     )
   }
 
+  function sentimentCooldownActive() {
+    if (sentimentTestMode()) {
+      return false
+    }
+
+    const lastEscalationAt = lastEscalationAtRef.current
+    return lastEscalationAt !== null && Date.now() - lastEscalationAt < SENTIMENT_ESCALATION_COOLDOWN_MS
+  }
+
+  async function handleSentimentSignal(
+    signal: SentimentSignal,
+    requestMessages: ChatMessage[],
+  ) {
+    if (signal === 'neutral') {
+      lastSentimentSignalRef.current = 'neutral'
+      return false
+    }
+
+    const changedFromNeutral = lastSentimentSignalRef.current === 'neutral'
+    lastSentimentSignalRef.current = signal
+
+    if (!changedFromNeutral || sentimentEscalationFired || sentimentCooldownActive()) {
+      return false
+    }
+
+    setSentimentEscalationFired(true)
+
+    if (signal === 'frustration') {
+      appendMessage(assistantMessage(
+        "It sounds like you're running into some friction. Would it help to connect with EdStratum's Founding leadership team?",
+      ))
+      trackEvent('sentiment_escalation_prompted', { signal })
+      return true
+    }
+
+    appendMessage(assistantMessage(
+      "This sounds time-sensitive. I'll make sure EdStratum's Founding leadership team sees the context right away.",
+    ))
+    trackEvent('sentiment_escalation_triggered', { signal })
+    lastEscalationAtRef.current = Date.now()
+    await streamAssistantResponse('escalation', requestMessages, null, intakeAnswers, {
+      escalationTrigger: 'sentiment',
+      sentimentSignal: signal,
+    })
+    return true
+  }
+
   async function streamAssistantResponse(
     requestMode: ConversationMode,
     requestMessages: ChatMessage[],
     nextIntakeIndex: number | null,
     nextIntakeAnswers: Record<string, string>,
+    options: StreamAssistantOptions = {},
   ) {
     const responseId = createId('assistant')
     const controller = new AbortController()
@@ -339,6 +403,7 @@ export default function StratumChat() {
           intakeIndex: nextIntakeIndex,
           intakeAnswers: nextIntakeAnswers,
           sessionId: getSessionId(),
+          ...options,
         },
         { signal: controller.signal },
       )) {
@@ -375,6 +440,10 @@ export default function StratumChat() {
             trackEvent('intake_completed')
           }
           if (event.escalate) {
+            lastEscalationAtRef.current = Date.now()
+            if (event.escalate === 'sentiment') {
+              setSentimentEscalationFired(true)
+            }
             trackEvent('escalation_triggered', { trigger: event.escalate })
             const confirmation = escalationConfirmation(event.escalation)
             if (confirmation) {
@@ -426,6 +495,17 @@ export default function StratumChat() {
     appendMessage(nextUserMessage)
     setInput('')
     setOpen(true)
+
+    if (requestMode !== 'escalation') {
+      const sentimentSignal = detectSentiment(
+        requestMessages
+          .filter((message) => message.role === 'user')
+          .map((message) => message.content),
+      )
+      if (await handleSentimentSignal(sentimentSignal, requestMessages)) {
+        return
+      }
+    }
 
     if (requestMode === 'intake') {
       const question = INTAKE_QUESTIONS[intakeIndex]

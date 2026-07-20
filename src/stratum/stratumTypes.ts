@@ -15,6 +15,8 @@ export type EscalationTrigger =
   | 'sentiment'
   | null
 
+export type SentimentEscalationSignal = 'frustration' | 'urgency'
+
 export type EscalationStatus = 'idle' | 'sending' | 'sent' | 'failed'
 
 export interface EscalationDelivery {
@@ -112,4 +114,6 @@ export interface StratumStreamRequest {
   intakeIndex: number | null
   intakeAnswers: Record<string, string>
   sessionId: string
+  escalationTrigger?: Exclude<EscalationTrigger, null>
+  sentimentSignal?: SentimentEscalationSignal
 }
