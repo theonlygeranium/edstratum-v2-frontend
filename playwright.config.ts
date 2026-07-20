@@ -15,6 +15,11 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  // CI environments run against a single `vite preview` server. Running
+  // browser tests in parallel causes port contention and flaky timeouts
+  // (chat-button visibility failures). Serialize to one worker in CI; local
+  // runs keep default parallelism for speed.
+  workers: process.env.CI ? 1 : undefined,
   projects: [
     {
       name: 'Desktop Chrome',
