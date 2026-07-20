@@ -5,13 +5,14 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest frontend production code commit verified: `e079033`
+- Latest frontend production code commit verified: `395d0b8`
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
-- Current production entry asset: `/assets/index-CCzuKg1J.js`
-- Current STRATUM chat asset: `/assets/StratumChat-CzklqdIB.js`
+- Current production entry asset: `/assets/index-sWHxdfmn.js`
+- Current STRATUM chat asset: `/assets/StratumChat-DZnOcHe2.js`
+- Current PDF snapshot assets: `/assets/stratumPDF-Bgc_chGe.js`, `/assets/pdf-vendor-B7fMFYQc.js`
 
 The recovered frontend source now includes the STRATUM chatbot under `src/stratum/`. The previous artifact-only chatbot patch is no longer the only source of truth.
 
@@ -31,6 +32,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Feature 4 sentiment escalation UI is deployed. Local and hosted CI passed with `64` Playwright tests; production rendered smoke intercepted `/api/chat` and confirmed urgency sends `escalationTrigger: "sentiment"` plus `sentimentSignal: "urgency"` while rendering the leadership handoff UI without sending email.
 - Feature 5 D1 persistence scaffolding is deployed. Local, branch, and production CI passed with `84` Playwright tests; live `/api/config` remains `persistenceEnabled: false`, `/api/sessions` fails closed with `d1_not_configured`, and rendered live smoke verified chat works with no session endpoint calls while persistence is disabled.
 - Feature 6 voice/TTS scaffolding is deployed and runtime-gated off. Local, branch, and production CI passed with `98` Playwright tests; live `/api/config` returns `voiceEnabled: false`, the production chat asset contains the voice/TTS code, backend health reports `tts.provider: "elevenlabs"` with `tts.status: "unconfigured"`, and rendered live smoke verified no voice controls appear while disabled.
+- Feature 7 PDF snapshot download is deployed. Local, branch, and production CI passed with `110` Playwright tests; production chat lazy-loads the PDF renderer chunks, rendered live smoke intercepted `/api/chat` and verified the `Download Summary` control plus a generated PDF download without sending any live handoff email.
 
 ## Notes For Future Agents
 
@@ -45,6 +47,7 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 - D1 persistence is source-ready but inactive until Cloudflare D1 binding `STRATUM_DB`, env var `SESSION_SECRET`, schema execution, and KV runtime flag `persistenceEnabled: true` are configured.
 - Voice/TTS is source-ready but inactive until Railway `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, Cloudflare Pages `VITE_TTS_ENABLED=true`, and runtime config `voiceEnabled: true` are configured.
+- PDF snapshot generation is client-side and lazy-loaded from `src/lib/stratumPDF.tsx`; there is no server round-trip or Node `fs`/`path`/`crypto` import in the client source.
 
 ## Completed Feature 1
 
@@ -85,6 +88,13 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Frontend commit `e079033` is deployed on Cloudflare Pages production with chat asset `/assets/StratumChat-CzklqdIB.js`.
 - Local QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, focused voice browser tests (`14 passed`), and full frontend suite (`98 passed`).
 - Hosted branch and main CI passed on 2026-07-20 with `98 passed`; production smoke verified `/api/config` returns `voiceEnabled: false`, the live chat chunk contains the voice/TTS code, and rendered production chat shows zero voice playback or mic controls while disabled.
+
+## Completed Feature 7
+
+- Enhancement spec Feature 7 is deployed in source and production: client-side `@react-pdf/renderer` session summary generation, `ChatPhase` completion/escalation gating, `Download Summary` UI with aria-label `Download session summary as PDF`, lazy PDF renderer chunking, and `tests/pdf-snapshot.spec.ts`.
+- Frontend commit `395d0b8` is deployed on Cloudflare Pages production with chat asset `/assets/StratumChat-DZnOcHe2.js` and PDF chunks `/assets/stratumPDF-Bgc_chGe.js` plus `/assets/pdf-vendor-B7fMFYQc.js`.
+- Local QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, no client `fs`/`path`/`crypto` imports, focused PDF browser tests (`12 passed`), and full frontend suite (`110 passed`).
+- Hosted branch and main CI passed on 2026-07-20 with `110 passed`; production rendered smoke intercepted `/api/chat`, verified the download button after an escalation state, generated `edstratum-intake-...pdf`, and produced no console errors or live notification traffic.
 
 ## Recommended Next Steps
 
