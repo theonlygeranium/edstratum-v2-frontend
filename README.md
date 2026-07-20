@@ -37,7 +37,10 @@ npm run qa:live
 EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live
 EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live:rendered
 npm run qa:activation
+npm run qa:activation -- --profile persistence --plan
+npm run qa:activation -- --profile voice --runtime-config-json
 npm run qa:activation -- --profile full-activation
+npm run qa:activation -- --profile full-activation --plan
 ```
 
 The live smoke checks production without sending handoff email or generating
@@ -60,8 +63,16 @@ source-controlled Cloudflare binding names, public `/api/config`, a zero-event
 analytics probe, an auth-gated D1 sessions probe, fail-closed or validation-only
 TTS behavior, and backend runtime providers. Use `--profile current`,
 `analytics`, `managed-rag`, `persistence`, `voice`, or `full-activation` to make
-the intended rollout state explicit. Add `--probe-rate-limit` only after binding
-`RATE_LIMIT`, because it intentionally sends a bounded burst to prove HTTP 429.
+the intended rollout state explicit. Use `--plan` to print the non-secret
+Cloudflare/Railway activation checklist for that profile, or
+`--runtime-config-json` to print only the JSON intended for the `STRATUM_CONFIG`
+key named `runtime`. Add `--probe-analytics-write` only after binding
+`ANALYTICS_EVENTS`, because it writes one synthetic allowlisted analytics event.
+Add `--probe-persistence-write` only after binding `STRATUM_DB`, setting
+`SESSION_SECRET`, and intentionally enabling runtime persistence, because it
+creates, writes, reads, and deletes one synthetic D1 session. Add
+`--probe-rate-limit` only after binding `RATE_LIMIT`, because it intentionally
+sends a bounded burst to prove HTTP 429.
 
 ## Deployment
 
