@@ -26,12 +26,8 @@ type AnalyticsPayload = {
 }
 
 // Resolve endpoint from Vite env — omit the var to disable analytics silently.
-const ANALYTICS_ENDPOINT: string = (
-  typeof import.meta !== 'undefined'
-    ? (import.meta as Record<string, unknown> & { env?: Record<string, string> })?.env
-        ?.VITE_ANALYTICS_ENDPOINT ?? ''
-    : ''
-) as string
+const ANALYTICS_ENDPOINT: string =
+  import.meta.env?.VITE_ANALYTICS_ENDPOINT ?? ''
 
 function getAnalyticsSessionId(): string {
   const key = 'stratum_analytics_sid'
