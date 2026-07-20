@@ -5,8 +5,9 @@ Date: 2026-07-20
 ## Current State
 
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
-- Latest source commit verified and deployed: `6e1f3d5`
+- Latest source commit observed in production deployment metadata: `f6cc8b4`
 - Cloudflare Pages project: `edstratumlabs`
+- Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
 - Backend origin compiled into production build: `https://stratum-backend-production-a340.up.railway.app`
 
@@ -27,20 +28,22 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Do not edit deployed Cloudflare bundle artifacts directly unless source is unavailable and the change is urgent.
 - The chatbot uses `VITE_STRATUM_API_URL`; omit it locally to use mock mode and avoid accidental escalation emails.
 - Do not trigger live escalation flows during QA unless notifications are explicitly suppressed or the user asks for an email test.
-- Cloudflare Pages is still being deployed by direct Wrangler upload. The repo is private but not yet confirmed as a connected Cloudflare Git integration.
+- Cloudflare Pages is connected to the private GitHub frontend repo.
+- Pushes to `main` automatically deploy production; pushes to feature branches create preview deployments.
+- Production has `VITE_STRATUM_API_URL` configured. Preview env vars were last verified as unset, so branch previews may use mock chat unless the backend URL is added to preview settings.
 - Production CORS allows `https://edstratumlabs.ai`; localhost requests to Railway are expected to fail unless backend CORS is expanded for local development.
 
 ## Recommended Next Steps
 
-1. Connect Cloudflare Pages to the private GitHub repo so `main` deploys automatically from source.
-2. Add a lightweight Playwright test suite for:
+1. Add/verify Cloudflare preview env var `VITE_STRATUM_API_URL` if preview branches should exercise the live backend instead of mock chat.
+2. Keep the lightweight Playwright test suite covering:
    - page loads without console errors
    - chatbot opens on desktop and mobile
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
 3. Add a backend eval-only or staging header path for safe escalation QA without sending email.
-4. Add a frontend CI workflow that runs `npm ci`, `npm run build`, and forbidden-copy scans before deploy.
-5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA.
+4. Add or maintain frontend CI that runs `npm ci`, `npm run build`, and forbidden-copy scans before deploy.
+5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
 6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
 7. Improve the chat control accessibility with Escape-to-close, focus return, and optional transcript reset.
 8. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.
