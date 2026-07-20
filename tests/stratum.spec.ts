@@ -44,6 +44,51 @@ test('page loads without console errors', async ({ page }) => {
   expect(errors, `Console errors: ${errors.join('\n')}`).toHaveLength(0)
 })
 
+test('build manifest exposes public deployment metadata', async ({ page }) => {
+  const response = await page.request.get('/build-manifest.json')
+  expect(response.ok()).toBeTruthy()
+
+  const manifest = (await response.json()) as {
+    schemaVersion?: number
+    app?: string
+    builtAt?: string
+    commitSha?: string
+    commitShortSha?: string
+    backendUrl?: string
+    assets?: Array<{
+      path?: string
+      bytes?: number
+      sha256?: string
+    }>
+    entryAsset?: string | null
+    stylesheetAsset?: string | null
+    chatAsset?: string | null
+    pdfAssets?: string[]
+  }
+
+  expect(manifest.schemaVersion).toBe(1)
+  expect(manifest.app).toBe('edstratum-v2-frontend')
+  expect(manifest.backendUrl).toMatch(/^https:\/\/stratum-backend-production-a340\.up\.railway\.app$/)
+  expect(manifest.commitSha).toMatch(/^(unknown|[a-f0-9]{40})$/)
+  expect(manifest.commitShortSha).toMatch(/^(unknown|[a-f0-9]{7})$/)
+  expect(Number.isNaN(Date.parse(manifest.builtAt ?? ''))).toBe(false)
+  expect(manifest.entryAsset).toMatch(/^\/assets\/index-[\w-]+\.js$/)
+  expect(manifest.stylesheetAsset).toMatch(/^\/assets\/index-[\w-]+\.css$/)
+  expect(manifest.chatAsset).toMatch(/^\/assets\/StratumChat-[\w-]+\.js$/)
+  expect(manifest.pdfAssets).toEqual(
+    expect.arrayContaining([
+      expect.stringMatching(/^\/assets\/stratumPDF-[\w-]+\.js$/),
+      expect.stringMatching(/^\/assets\/pdf-vendor-[\w-]+\.js$/),
+    ]),
+  )
+  expect(manifest.assets?.length).toBeGreaterThan(5)
+  for (const asset of manifest.assets ?? []) {
+    expect(asset.path).toMatch(/^\/assets\/.+/)
+    expect(asset.bytes).toBeGreaterThan(0)
+    expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/)
+  }
+})
+
 // ── Trigger button ───────────────────────────────────────────────────────────
 
 test('chat trigger button is visible on desktop', async ({ page }) => {

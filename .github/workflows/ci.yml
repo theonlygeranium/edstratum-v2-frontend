@@ -44,7 +44,9 @@ jobs:
       - name: Verify dist output
         run: |
           test -f dist/index.html || (echo "ERROR: dist/index.html missing" && exit 1)
+          test -f dist/build-manifest.json || (echo "ERROR: dist/build-manifest.json missing" && exit 1)
           echo "✓ dist/index.html present"
+          echo "✓ dist/build-manifest.json present"
 
       - name: Forbidden copy scan
         # Rejects any source file that contains a direct scheduling link or
