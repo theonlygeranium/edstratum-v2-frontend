@@ -7,7 +7,7 @@ Date: 2026-07-20
 - Source of record: `https://github.com/theonlygeranium/edstratum-v2-frontend`
 - Latest frontend production code-bearing commit verified: `36f201f`
 - Latest verified code-bearing manifest commit: `36f201f`; docs-only pushes can advance the manifest git SHA while leaving code-bearing asset hashes unchanged.
-- Latest verified workflow-only manifest commit: `d01ce68`
+- GitHub Actions action-migration commit verified: `d01ce68`; later report-only pushes can advance the manifest git SHA while leaving code-bearing asset hashes unchanged.
 - Cloudflare Pages project: `edstratumlabs`
 - Cloudflare source: GitHub repo `theonlygeranium/edstratum-v2-frontend`
 - Production domain: `https://edstratumlabs.ai`
