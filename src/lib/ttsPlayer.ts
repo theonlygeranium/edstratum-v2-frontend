@@ -9,6 +9,7 @@ type AudioContextConstructor = new () => AudioContext
 type AudioWindow = Window & {
   AudioContext?: AudioContextConstructor
   webkitAudioContext?: AudioContextConstructor
+  MediaSource?: typeof MediaSource
 }
 
 export interface TTSPlayerOptions {
@@ -23,6 +24,8 @@ export class TTSPlayer {
   private speaking = false
   private audioContext: AudioContext | null = null
   private currentSource: AudioBufferSourceNode | null = null
+  private currentMediaElement: HTMLAudioElement | null = null
+  private currentObjectUrl: string | null = null
   private queue: Promise<void> = Promise.resolve()
 
   constructor(options: TTSPlayerOptions = {}) {
@@ -57,6 +60,7 @@ export class TTSPlayer {
       // Stopping an already-ended source can throw in some browsers.
     }
     this.currentSource = null
+    this.cleanupMediaElement()
   }
 
   async speak(text: string) {
@@ -88,6 +92,16 @@ export class TTSPlayer {
       return
     }
 
+    const contentType = audioContentType(response.headers.get('Content-Type'))
+    if (response.body && mediaSourceSupported(contentType)) {
+      await this.playStreaming(response.body, contentType)
+      return
+    }
+
+    await this.playBuffered(response)
+  }
+
+  private async playBuffered(response: Response) {
     const audioData = await response.arrayBuffer()
     const AudioContextClass = audioContextConstructor()
     if (!AudioContextClass) {
@@ -116,6 +130,132 @@ export class TTSPlayer {
       this.speaking = true
       source.start()
     })
+  }
+
+  private async playStreaming(stream: ReadableStream<Uint8Array>, contentType: string) {
+    const AudioContextClass = audioContextConstructor()
+    const MediaSourceClass = mediaSourceConstructor()
+    if (!AudioContextClass || !MediaSourceClass) {
+      return
+    }
+
+    this.cleanupMediaElement()
+    const context = this.audioContext ?? new AudioContextClass()
+    this.audioContext = context
+    if (context.state === 'suspended') {
+      await context.resume()
+    }
+
+    const audio = new Audio()
+    audio.preload = 'auto'
+    audio.hidden = true
+    const mediaSource = new MediaSourceClass()
+    const objectUrl = URL.createObjectURL(mediaSource)
+    audio.src = objectUrl
+    document.body.append(audio)
+
+    let mediaNode: MediaElementAudioSourceNode | null = null
+    try {
+      mediaNode = context.createMediaElementSource(audio)
+      mediaNode.connect(context.destination)
+    } catch {
+      mediaNode = null
+    }
+
+    this.currentMediaElement = audio
+    this.currentObjectUrl = objectUrl
+
+    await new Promise<void>((resolve) => {
+      let resolved = false
+      const finish = () => {
+        if (resolved) {
+          return
+        }
+        resolved = true
+        mediaNode?.disconnect()
+        if (this.currentMediaElement === audio) {
+          this.cleanupMediaElement()
+        }
+        this.speaking = false
+        resolve()
+      }
+
+      audio.addEventListener('ended', finish, { once: true })
+      audio.addEventListener('error', finish, { once: true })
+
+      mediaSource.addEventListener(
+        'sourceopen',
+        () => {
+          void this.appendStreamingAudio(stream, mediaSource, contentType, audio)
+            .then(() => {
+              if (!this.speaking) {
+                finish()
+              }
+            })
+            .catch(finish)
+        },
+        { once: true },
+      )
+    })
+  }
+
+  private async appendStreamingAudio(
+    stream: ReadableStream<Uint8Array>,
+    mediaSource: MediaSource,
+    contentType: string,
+    audio: HTMLAudioElement,
+  ) {
+    const sourceBuffer = mediaSource.addSourceBuffer(contentType)
+    const reader = stream.getReader()
+    let started = false
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) {
+          break
+        }
+        if (!value || value.byteLength === 0) {
+          continue
+        }
+        await appendBuffer(sourceBuffer, value)
+        if (!started) {
+          started = true
+          this.speaking = true
+          try {
+            await audio.play()
+          } catch {
+            this.speaking = false
+            break
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    await waitForSourceBuffer(sourceBuffer)
+    if (mediaSource.readyState === 'open') {
+      mediaSource.endOfStream()
+    }
+  }
+
+  private cleanupMediaElement() {
+    const element = this.currentMediaElement
+    this.currentMediaElement = null
+    try {
+      element?.pause()
+      element?.removeAttribute('src')
+      element?.load()
+      element?.remove()
+    } catch {
+      // Media cleanup is best-effort across browser implementations.
+    }
+
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl)
+      this.currentObjectUrl = null
+    }
   }
 }
 
@@ -158,6 +298,83 @@ function audioContextConstructor() {
 
   const audioWindow = window as AudioWindow
   return audioWindow.AudioContext ?? audioWindow.webkitAudioContext ?? null
+}
+
+function mediaSourceConstructor() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return (window as AudioWindow).MediaSource ?? null
+}
+
+function mediaSourceSupported(contentType: string) {
+  const MediaSourceClass = mediaSourceConstructor()
+  if (!MediaSourceClass || typeof URL.createObjectURL !== 'function') {
+    return false
+  }
+
+  if (typeof MediaSourceClass.isTypeSupported === 'function') {
+    return MediaSourceClass.isTypeSupported(contentType)
+  }
+
+  return true
+}
+
+function audioContentType(header: string | null) {
+  return (header || 'audio/mpeg').split(';')[0].trim() || 'audio/mpeg'
+}
+
+async function appendBuffer(sourceBuffer: SourceBuffer, chunk: Uint8Array) {
+  await waitForSourceBuffer(sourceBuffer)
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      sourceBuffer.removeEventListener('updateend', onUpdateEnd)
+      sourceBuffer.removeEventListener('error', onError)
+    }
+    const onUpdateEnd = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('tts_source_buffer_error'))
+    }
+    sourceBuffer.addEventListener('updateend', onUpdateEnd, { once: true })
+    sourceBuffer.addEventListener('error', onError, { once: true })
+
+    try {
+      const buffer = new ArrayBuffer(chunk.byteLength)
+      new Uint8Array(buffer).set(chunk)
+      sourceBuffer.appendBuffer(buffer)
+    } catch (error) {
+      cleanup()
+      reject(error)
+    }
+  })
+}
+
+async function waitForSourceBuffer(sourceBuffer: SourceBuffer) {
+  if (!sourceBuffer.updating) {
+    return
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      sourceBuffer.removeEventListener('updateend', onUpdateEnd)
+      sourceBuffer.removeEventListener('error', onError)
+    }
+    const onUpdateEnd = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('tts_source_buffer_error'))
+    }
+    sourceBuffer.addEventListener('updateend', onUpdateEnd, { once: true })
+    sourceBuffer.addEventListener('error', onError, { once: true })
+  })
 }
 
 function prefersReducedMotion() {

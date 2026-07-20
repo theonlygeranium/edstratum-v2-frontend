@@ -97,6 +97,148 @@ async function enableTTSTestFlag(page: Page) {
   }, TTS_TEST_OVERRIDE_KEY)
 }
 
+async function mockStreamingPlayback(page: Page) {
+  await page.addInitScript(() => {
+    type StreamingProbe = {
+      appends: number
+      ended: boolean
+      mediaNodes: number
+      objectUrls: number
+      playCalls: number
+      revoked: number
+      sourceType: string | null
+    }
+
+    const probe: StreamingProbe = {
+      appends: 0,
+      ended: false,
+      mediaNodes: 0,
+      objectUrls: 0,
+      playCalls: 0,
+      revoked: 0,
+      sourceType: null,
+    }
+
+    class MockSourceBuffer extends EventTarget {
+      updating = false
+
+      appendBuffer(buffer: BufferSource) {
+        probe.appends += buffer.byteLength
+        this.updating = true
+        window.setTimeout(() => {
+          this.updating = false
+          this.dispatchEvent(new Event('updateend'))
+        }, 0)
+      }
+    }
+
+    class MockMediaSource extends EventTarget {
+      static isTypeSupported(type: string) {
+        return type === 'audio/mpeg'
+      }
+
+      readyState: 'closed' | 'open' | 'ended' = 'closed'
+
+      constructor() {
+        super()
+        window.setTimeout(() => {
+          this.readyState = 'open'
+          this.dispatchEvent(new Event('sourceopen'))
+        }, 0)
+      }
+
+      addSourceBuffer(type: string) {
+        probe.sourceType = type
+        return new MockSourceBuffer()
+      }
+
+      endOfStream() {
+        this.readyState = 'ended'
+        probe.ended = true
+      }
+    }
+
+    class MockAudioContext {
+      state = 'running'
+      destination = {}
+
+      async resume() {
+        return undefined
+      }
+
+      createMediaElementSource() {
+        probe.mediaNodes += 1
+        return {
+          connect() {
+            return undefined
+          },
+          disconnect() {
+            return undefined
+          },
+        }
+      }
+
+      createBufferSource() {
+        return {
+          connect() {
+            return undefined
+          },
+          start() {
+            return undefined
+          },
+          stop() {
+            return undefined
+          },
+          onended: null,
+        }
+      }
+
+      async decodeAudioData(buffer: ArrayBuffer) {
+        return buffer
+      }
+    }
+
+    Object.defineProperty(window, 'MediaSource', {
+      configurable: true,
+      writable: true,
+      value: MockMediaSource,
+    })
+    Object.defineProperty(window, 'AudioContext', {
+      configurable: true,
+      writable: true,
+      value: MockAudioContext,
+    })
+    Object.defineProperty(window, 'webkitAudioContext', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    })
+
+    URL.createObjectURL = () => {
+      probe.objectUrls += 1
+      return `blob:stratum-tts-${probe.objectUrls}`
+    }
+    URL.revokeObjectURL = () => {
+      probe.revoked += 1
+    }
+
+    HTMLMediaElement.prototype.play = function play() {
+      probe.playCalls += 1
+      window.setTimeout(() => {
+        this.dispatchEvent(new Event('ended'))
+      }, 0)
+      return Promise.resolve()
+    }
+    HTMLMediaElement.prototype.pause = function pause() {
+      return undefined
+    }
+
+    ;(window as unknown as {
+      __STRATUM_TTS_STREAMING__: StreamingProbe
+    }).__STRATUM_TTS_STREAMING__ = probe
+  })
+}
+
 async function openChat(page: Page): Promise<Locator> {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
@@ -237,4 +379,55 @@ test('markdown is stripped before text is sent to TTS', async ({ page }) => {
   await expect.poll(() => ttsPayload?.text ?? '').toContain('Your Situation')
   expect(ttsPayload?.text).not.toMatch(/[#*_`]/)
   expect(ttsPayload?.text?.length).toBeLessThanOrEqual(500)
+})
+
+test('TTS streams audio through MediaSource when available', async ({ page }) => {
+  let ttsCalls = 0
+  await mockStreamingPlayback(page)
+  await enableTTSTestFlag(page)
+  await mockRuntimeConfig(page, true)
+  await page.route('**/api/tts', async (route) => {
+    ttsCalls += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'audio/mpeg',
+      body: 'mock-mp3-stream',
+    })
+  })
+
+  const dialog = await openChat(page)
+  await dialog.getByRole('button', { name: /enable voice playback/i }).click()
+  await sendMessage(dialog, 'Hello there')
+
+  await expect(dialog.getByText(/Share the workflow or constraint/i)).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect.poll(() => ttsCalls).toBeGreaterThan(0)
+  await expect.poll(async () => page.evaluate(() => (
+    window as unknown as {
+      __STRATUM_TTS_STREAMING__?: {
+        appends: number
+        ended: boolean
+        mediaNodes: number
+        objectUrls: number
+        playCalls: number
+        revoked: number
+        sourceType: string | null
+      }
+    }
+  ).__STRATUM_TTS_STREAMING__)).toMatchObject({
+    ended: true,
+    mediaNodes: 1,
+    objectUrls: 1,
+    playCalls: 1,
+    sourceType: 'audio/mpeg',
+  })
+  const probe = await page.evaluate(() => (
+    window as unknown as {
+      __STRATUM_TTS_STREAMING__?: { appends: number; revoked: number }
+    }
+  ).__STRATUM_TTS_STREAMING__)
+  expect(probe?.appends).toBeGreaterThan(0)
+  expect(probe?.revoked).toBeGreaterThanOrEqual(1)
+  await expect(dialog.getByText(/temporary issue/i)).toHaveCount(0)
 })
