@@ -8,21 +8,22 @@ pages_build_output_dir = "./dist"
 [vars]
 RAILWAY_API_URL = "https://stratum-backend-production-a340.up.railway.app"
 
-# Runtime config and rate-limit KV bindings. Create namespaces in Cloudflare,
-# then bind them in the Pages project before enabling runtime feature flags.
-# [[kv_namespaces]]
-# binding = "STRATUM_CONFIG"
-# id = "<STRATUM_CONFIG_KV_NAMESPACE_ID>"
-#
-# [[kv_namespaces]]
-# binding = "RATE_LIMIT"
-# id = "<RATE_LIMIT_KV_NAMESPACE_ID>"
-#
+# Runtime config KV binding. Stores feature flags consumed by /api/config.
+# Seeded with: {"ragEnabled":true,"voiceEnabled":false,"persistenceEnabled":false,"maxIntakeQuestions":7,"ttsEnabledByDefault":false}
+[[kv_namespaces]]
+binding = "STRATUM_CONFIG"
+id = "961355b9974749c19efd2ca36bc7b065"
+
+# Rate-limit KV binding. Stores per-IP request counters for /api/chat burst protection.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "c27f060d81d8474ebfd0b273105d55a3"
+
 # Privacy-safe aggregate analytics KV binding. This stores daily counters only,
 # never prompt text, intake answers, raw session IDs, or PII.
-# [[kv_namespaces]]
-# binding = "ANALYTICS_EVENTS"
-# id = "<ANALYTICS_EVENTS_KV_NAMESPACE_ID>"
+[[kv_namespaces]]
+binding = "ANALYTICS_EVENTS"
+id = "31bf36d4959343a990dffeff121973a8"
 
 # Feature 5 D1 persistence binding. Uncomment and replace database_id after
 # creating the Cloudflare D1 database named `stratum-conversations`. Also add
@@ -31,7 +32,7 @@ RAILWAY_API_URL = "https://stratum-backend-production-a340.up.railway.app"
 # [[d1_databases]]
 # binding = "STRATUM_DB"
 # database_name = "stratum-conversations"
-# database_id = "<D1_DATABASE_ID>"
+# database_id = "c8841e19-77fd-4ca0-974c-d55b5e453af4"
 
 # Feature 6 voice rollout also requires the Cloudflare Pages build-time
 # variable VITE_TTS_ENABLED=true plus Railway-side ELEVENLABS_API_KEY. Keep it
