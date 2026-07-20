@@ -35,6 +35,7 @@ VITE_STRATUM_API_URL=https://stratum-backend-production-a340.up.railway.app npm 
 ```bash
 npm run qa:live
 EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live
+EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live:rendered
 ```
 
 The live smoke checks production without sending handoff email or generating
@@ -42,9 +43,15 @@ voice audio. It verifies `/build-manifest.json`, safe runtime flags,
 same-origin `/api/health`, disabled `/api/tts` fail-closed behavior,
 privacy-safe `/api/analytics` fail-closed behavior while KV is unbound, direct
 Railway `/api/health` and `/api/runtime`, and forbidden-copy scans on the root
-HTML plus current STRATUM chat asset. Override `FRONTEND_URL`, `BACKEND_URL`,
-and `EXPECTED_*` env vars only when intentionally testing a staged rollout
-state.
+HTML plus current STRATUM chat asset.
+
+The rendered live smoke uses Playwright against the production URL. It verifies
+the page shell, console/page/request health, desktop STRATUM chat open and a
+non-escalation live RAG response with expandable citations, hidden voice
+controls while disabled, and mobile dialog bounds. Screenshots are written under
+`/tmp` by default, or to `LIVE_RENDER_SCREENSHOT_DIR` when set. Override
+`FRONTEND_URL`, `BACKEND_URL`, `LIVE_RENDER_PROMPT`, and `EXPECTED_*` env vars
+only when intentionally testing a staged rollout state.
 
 ## Deployment
 
