@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "qa:live": "node scripts/live-smoke.mjs",
     "qa:live:rendered": "node scripts/live-render-smoke.mjs",
+    "qa:activation": "node scripts/activation-readiness.mjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "playwright test",

@@ -36,6 +36,8 @@ VITE_STRATUM_API_URL=https://stratum-backend-production-a340.up.railway.app npm 
 npm run qa:live
 EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live
 EXPECTED_MANIFEST_COMMIT="$(git rev-parse --short HEAD)" npm run qa:live:rendered
+npm run qa:activation
+npm run qa:activation -- --profile full-activation
 ```
 
 The live smoke checks production without sending handoff email or generating
@@ -52,6 +54,14 @@ controls while disabled, and mobile dialog bounds. Screenshots are written under
 `/tmp` by default, or to `LIVE_RENDER_SCREENSHOT_DIR` when set. Override
 `FRONTEND_URL`, `BACKEND_URL`, `LIVE_RENDER_PROMPT`, and `EXPECTED_*` env vars
 only when intentionally testing a staged rollout state.
+
+The activation readiness audit is safe for production by default. It checks the
+source-controlled Cloudflare binding names, public `/api/config`, a zero-event
+analytics probe, an auth-gated D1 sessions probe, fail-closed or validation-only
+TTS behavior, and backend runtime providers. Use `--profile current`,
+`analytics`, `managed-rag`, `persistence`, `voice`, or `full-activation` to make
+the intended rollout state explicit. Add `--probe-rate-limit` only after binding
+`RATE_LIMIT`, because it intentionally sends a bounded burst to prove HTTP 429.
 
 ## Deployment
 

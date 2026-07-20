@@ -8,10 +8,32 @@ pages_build_output_dir = "./dist"
 [vars]
 RAILWAY_API_URL = "https://stratum-backend-production-a340.up.railway.app"
 
-# Feature 5 D1 persistence bindings. Uncomment and replace database_id after
-# creating the Cloudflare D1 database named `stratum-conversations`.
-# Also add SESSION_SECRET in Cloudflare Pages environment variables.
+# Runtime config and rate-limit KV bindings. Create namespaces in Cloudflare,
+# then bind them in the Pages project before enabling runtime feature flags.
+# [[kv_namespaces]]
+# binding = "STRATUM_CONFIG"
+# id = "<STRATUM_CONFIG_KV_NAMESPACE_ID>"
+#
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "<RATE_LIMIT_KV_NAMESPACE_ID>"
+#
+# Privacy-safe aggregate analytics KV binding. This stores daily counters only,
+# never prompt text, intake answers, raw session IDs, or PII.
+# [[kv_namespaces]]
+# binding = "ANALYTICS_EVENTS"
+# id = "<ANALYTICS_EVENTS_KV_NAMESPACE_ID>"
+
+# Feature 5 D1 persistence binding. Uncomment and replace database_id after
+# creating the Cloudflare D1 database named `stratum-conversations`. Also add
+# SESSION_SECRET in Cloudflare Pages environment variables before setting the
+# STRATUM_CONFIG runtime flag persistenceEnabled=true.
 # [[d1_databases]]
 # binding = "STRATUM_DB"
 # database_name = "stratum-conversations"
 # database_id = "<D1_DATABASE_ID>"
+
+# Feature 6 voice rollout also requires the Cloudflare Pages build-time
+# variable VITE_TTS_ENABLED=true plus Railway-side ELEVENLABS_API_KEY. Keep it
+# unset until `/api/health` reports tts.status ok and STRATUM_CONFIG runtime
+# flag voiceEnabled=true is intentional.
