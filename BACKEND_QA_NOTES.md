@@ -11,19 +11,16 @@ The escalation flow (`trigger: 'high_intent' | 'explicit' | 'sentiment' | 'confi
 
 ---
 
-## Recommended: `X-Stratum-QA` Request Header
+## Implemented: `X-Stratum-QA` Request Header
 
-Implement a suppression flag on the Railway backend. When present, the backend runs the full escalation logic — building the snapshot, setting the trigger type, streaming the response — but **skips all outbound notifications**.
+The Railway backend supports a suppression flag. When present, the backend runs the full escalation logic — building the snapshot, setting the trigger type, streaming the response — but **skips all outbound notifications**.
 
 ### Frontend usage (CI / local testing)
 
-The frontend already passes a `sessionId` in the request body. Add the header in `stratumApi.ts` when `VITE_STRATUM_API_URL` is set and a QA flag env var is present:
+The frontend passes a `sessionId` in the request body and adds the header in `stratumApi.ts` when `VITE_STRATUM_API_URL` is set and `VITE_STRATUM_QA=true`:
 
 ```ts
-// In streamStratumResponse(), add to the fetch headers:
-...(import.meta.env.VITE_STRATUM_QA === 'true' && {
-  'X-Stratum-QA': 'suppress-notifications',
-}),
+headers['X-Stratum-QA'] = 'true'
 ```
 
 Set `VITE_STRATUM_QA=true` in the Cloudflare Pages **Preview** environment variables only — never in Production.
@@ -31,13 +28,8 @@ Set `VITE_STRATUM_QA=true` in the Cloudflare Pages **Preview** environment varia
 ### Backend implementation (Railway — Python/FastAPI)
 
 ```python
-# In your /api/chat handler, before any notification dispatch:
-is_qa = request.headers.get("X-Stratum-QA") == "suppress-notifications"
-
-# Guard every outbound call:
-if not is_qa:
-    await send_escalation_email(snapshot)
-    await post_discord_webhook(snapshot)
+# The backend treats X-Stratum-QA: true as notification-suppressed QA.
+is_qa = request.headers.get("X-Stratum-QA") == "true"
 ```
 
 Keep the QA header check simple — no auth token needed. The header name itself is the shared secret between frontend and backend; it is not a security boundary, only a safety guardrail for test runs.

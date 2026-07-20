@@ -48,6 +48,9 @@ jobs:
           echo "✓ dist/index.html present"
           echo "✓ dist/build-manifest.json present"
 
+      - name: Build Cloudflare Pages Functions
+        run: npx wrangler pages functions build
+
       - name: Forbidden copy scan
         # Rejects any source file that contains a direct scheduling link or
         # a real personal name/email that could violate the discretion policy.

@@ -246,13 +246,18 @@ export async function* streamStratumResponse(
   }
 
   let response: Response
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream',
+    'Content-Type': 'application/json',
+  }
+  if (import.meta.env.VITE_STRATUM_QA === 'true') {
+    headers['X-Stratum-QA'] = 'true'
+  }
+
   try {
     response = await fetch(`${STRATUM_API_URL}/api/chat`, {
       method: 'POST',
-      headers: {
-        Accept: 'text/event-stream',
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(request),
       signal: options.signal,
     })

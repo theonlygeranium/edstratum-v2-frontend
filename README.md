@@ -11,7 +11,7 @@ React 19 + Vite 6 + Tailwind CSS v4 SPA deployed to Cloudflare Pages at [edstrat
 | Styling | Tailwind CSS v4 (`@theme` directive, no config file) |
 | Animation | `motion/react` v12 — `LazyMotion` + `m.*` strict mode |
 | SEO | `react-helmet-async` + static JSON-LD in `index.html` |
-| Deployment | Cloudflare Pages (direct upload via Wrangler) |
+| Deployment | Cloudflare Pages via GitHub-connected `main` branch |
 | Edge API | Cloudflare Pages Functions under `functions/` |
 
 ## Local Development
@@ -32,21 +32,24 @@ VITE_STRATUM_API_URL=https://stratum-backend-production-a340.up.railway.app npm 
 
 ## Deployment
 
-Copy `deploy.sh.example` to `deploy.sh`, fill in your Cloudflare credentials, then:
+Cloudflare Pages is connected to this GitHub repo. The normal production path is:
 
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+git push origin main
 ```
+
+Pushes to feature branches create Cloudflare preview deployments. Before merging
+or pushing production behavior, require/verify GitHub status `CI / build-and-test`.
+
+`deploy.sh` is retained only as an explicit emergency direct-upload fallback and
+does not deploy production unless confirmation environment variables are set.
 
 ### Required environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `CLOUDFLARE_API_KEY` | Cloudflare Global API Key |
-| `CLOUDFLARE_EMAIL` | Cloudflare account email |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID (`f69a...`) |
 | `VITE_STRATUM_API_URL` | Public STRATUM backend origin, without trailing slash |
+| `VITE_STRATUM_QA` | Preview/staging only. When `true`, real-backend chat requests include `X-Stratum-QA: true` to suppress outbound notifications. Never enable in production. |
 
 ## Architecture notes
 
@@ -56,7 +59,7 @@ chmod +x deploy.sh
 - **STRATUM chat**: The floating intake advisor lives in `src/stratum/`. It uses `VITE_STRATUM_API_URL` to stream `/api/chat` SSE events from Railway. If the URL is omitted outside the production hostnames, it falls back to the local demo stream and does not send escalation emails.
 - **Pages Functions**: `/api/health` proxies Railway `/api/health`, `/api/config` returns non-secret runtime flags, and `_middleware.ts` applies best-effort KV rate limiting when the `RATE_LIMIT` binding exists.
 - **Escalation discretion**: Client-facing copy should refer to the `Founding leadership team` until the backend confirms that a notification has been sent. Do not add personal names or scheduling links in the frontend unless they are explicitly provisioned and approved.
-- **Deployment note**: This repo is now the frontend source of truth. The previous Cloudflare Pages deployment was a direct-upload artifact-only deploy (no Git integration). Connect this repo to Cloudflare Pages via the dashboard or continue using `deploy.sh` for direct uploads.
+- **Deployment note**: This repo is the frontend source of truth. Cloudflare Pages production deploys from GitHub `main`; do not patch generated Cloudflare artifacts or use direct uploads for normal releases.
 
 ## Project structure
 

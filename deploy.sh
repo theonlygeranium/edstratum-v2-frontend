@@ -1,41 +1,58 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# deploy.sh — EdStratum Labs V2 one-command deploy
-# Uses Cloudflare Global API Key authentication
+# deploy.sh — EdStratum Labs V2 emergency direct upload
 #
-# Usage:
-#   export CLOUDFLARE_API_KEY="your-global-api-key"
-#   export CLOUDFLARE_EMAIL="your@email.com"
-#   export CLOUDFLARE_ACCOUNT_ID="your-account-id"
-#   ./deploy.sh
+# Normal production deploys come from GitHub-connected Cloudflare Pages:
+#   git push origin main
 #
-# Or copy this file to deploy.local.sh (gitignored), hard-code
-# your credentials there, and run that file instead.
+# This script is an emergency fallback only. It refuses to run unless
+# CONFIRM_DIRECT_CLOUDFLARE_DEPLOY=yes is set, and it deploys to the
+# non-production "manual" branch unless CLOUDFLARE_PAGES_BRANCH is overridden.
 # ──────────────────────────────────────────────────────────────
-set -e
+set -euo pipefail
 
-: "${CLOUDFLARE_API_KEY:?CLOUDFLARE_API_KEY is required}"
-: "${CLOUDFLARE_EMAIL:?CLOUDFLARE_EMAIL is required}"
-: "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID is required}"
+if [[ "${CONFIRM_DIRECT_CLOUDFLARE_DEPLOY:-}" != "yes" ]]; then
+  echo "Direct Cloudflare deploys bypass GitHub CI and are disabled by default." >&2
+  echo "Use: git push origin main" >&2
+  echo "For an emergency direct upload, set CONFIRM_DIRECT_CLOUDFLARE_DEPLOY=yes." >&2
+  exit 2
+fi
 
-export CLOUDFLARE_API_KEY
-export CLOUDFLARE_EMAIL
-export CLOUDFLARE_ACCOUNT_ID
+branch="${CLOUDFLARE_PAGES_BRANCH:-manual}"
+if [[ "${branch}" == "main" && "${CONFIRM_PRODUCTION_DIRECT_DEPLOY:-}" != "yes" ]]; then
+  echo "Direct production upload to branch main requires CONFIRM_PRODUCTION_DIRECT_DEPLOY=yes." >&2
+  exit 2
+fi
 
-echo "=== EdStratum Labs V2 — Build & Deploy ==="
+echo "=== EdStratum Labs V2 — Emergency Direct Upload ==="
 echo ""
+
+echo "▶  Type-checking..."
+npm run type-check
+
+echo ""
+echo "▶  Linting..."
+npm run lint
 
 echo "▶  Building..."
 npm run build
 
 echo ""
-echo "▶  Deploying to Cloudflare Pages (production)..."
+echo "▶  Building Cloudflare Pages Functions..."
+npx wrangler pages functions build
+
+echo ""
+echo "▶  Deploying to Cloudflare Pages branch ${branch}..."
 npx wrangler pages deploy dist \
   --project-name edstratumlabs \
-  --branch main \
-  --commit-message "Release: $(date -u '+%Y-%m-%d %H:%M UTC')"
+  --branch "${branch}" \
+  --commit-message "Emergency direct upload: $(date -u '+%Y-%m-%d %H:%M UTC')"
 
 echo ""
 echo "✅  Deploy complete."
-echo "    Live:    https://edstratumlabs.ai"
-echo "    Preview: https://edstratumlabs.pages.dev"
+if [[ "${branch}" == "main" ]]; then
+  echo "    Production: https://edstratumlabs.ai"
+else
+  echo "    Branch:     ${branch}"
+  echo "    Preview:    https://edstratumlabs.pages.dev"
+fi
