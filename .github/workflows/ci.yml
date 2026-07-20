@@ -71,15 +71,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start preview server
-        run: npx vite preview --port 4173 &
-        env:
-          # No VITE_STRATUM_API_URL → mock mode, no live escalation
-          NODE_VERSION: '20'
-
-      - name: Wait for preview server
-        run: npx wait-on http://localhost:4173 --timeout 30000
-
       - name: Run Playwright tests
         run: npx playwright test
 

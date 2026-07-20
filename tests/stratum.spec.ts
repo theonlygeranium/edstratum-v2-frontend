@@ -120,16 +120,16 @@ test('user message appears and assistant responds', async ({ page }) => {
   await page.getByRole('button', { name: /open stratum chat/i }).click()
   const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
   const input = page.getByPlaceholder(/ask stratum/i)
+  const sendBtn = dialog.getByRole('button', { name: 'Send', exact: true })
 
   await input.fill('What services does EdStratum Labs offer?')
-  await page.getByRole('button', { name: /send/i }).click()
+  await sendBtn.click()
 
   // User bubble appears
   await expect(dialog.locator('.bg-primary.text-white').filter({ hasText: /edstratum labs/i })).toBeVisible({ timeout: 5000 })
 
-  // Send button re-enables after response (mock stream resolves quickly)
-  const sendBtn = page.getByRole('button', { name: /send/i })
-  await expect(sendBtn).toBeEnabled({ timeout: 15000 })
+  // Assistant response completes in mock mode
+  await expect(dialog.getByText(/practical next step/i)).toBeVisible({ timeout: 15000 })
 
   // At least one assistant bubble must appear beyond the greeting
   const assistantBubbles = dialog.locator('.border.border-border.bg-surface.text-text-secondary')
@@ -142,21 +142,23 @@ test('reset button clears conversation back to initial greeting', async ({ page 
   await page.getByRole('button', { name: /open stratum chat/i }).click()
   const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
   const input = page.getByPlaceholder(/ask stratum/i)
+  const sendBtn = dialog.getByRole('button', { name: 'Send', exact: true })
 
   // Send a message
   await input.fill('Hello')
-  await page.getByRole('button', { name: /send/i }).click()
-  await page.getByRole('button', { name: /send/i }).waitFor({ state: 'visible' })
+  await sendBtn.click()
+  await expect(dialog.getByText(/practical next step/i)).toBeVisible({ timeout: 15000 })
 
   // Confirm multiple messages exist
-  const bubbles = dialog.locator('.border.border-border.bg-surface')
-  expect(await bubbles.count()).toBeGreaterThanOrEqual(2)
+  await expect(dialog.locator('.bg-primary.text-white').filter({ hasText: 'Hello' })).toBeVisible()
 
   // Reset
   await page.getByRole('button', { name: /clear conversation/i }).click()
 
-  // Only the initial greeting should remain
-  await expect(bubbles).toHaveCount(1, { timeout: 3000 })
+  // User and generated assistant messages should be gone; prompt chips return.
+  await expect(dialog.getByText('Hello', { exact: true })).not.toBeVisible({ timeout: 3000 })
+  await expect(dialog.getByText(/Try one of these to get started/i)).toBeVisible()
+  await expect(dialog.getByText(/Hi, I'm STRATUM/i)).toBeVisible()
 
   // Input should regain focus after reset
   await expect(input).toBeFocused()
@@ -169,10 +171,10 @@ test('escalation panel copy is discretion-safe', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
 
   // Trigger escalation via the Connect button
-  await page.getByRole('button', { name: /connect/i }).click()
+  await dialog.getByRole('button', { name: 'Connect', exact: true }).click()
 
   // Wait for response
-  await page.getByRole('button', { name: /send/i }).waitFor({ state: 'visible' })
+  await expect(dialog.getByText(/Leadership handoff/i)).toBeVisible({ timeout: 10000 })
 
   // Assert escalation panel appeared
   const escalationPanel = dialog.locator('text=Leadership handoff')
