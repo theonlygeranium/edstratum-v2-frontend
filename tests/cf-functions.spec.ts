@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test'
 
 import { onRequest as middleware } from '../functions/_middleware'
 import { onRequestGet as config } from '../functions/api/config'
+import { onRequestPost as escalate } from '../functions/api/escalate'
 import { onRequestGet as health } from '../functions/api/health'
 import { onRequest as sessions } from '../functions/api/sessions/[[route]]'
+import { onRequestPost as tts } from '../functions/api/tts'
 
 class MemoryKV {
   private values = new Map<string, string>()
@@ -297,6 +299,154 @@ test('cached health response has Cache-Control header', async () => {
   } as never)
 
   expect(response.headers.get('Cache-Control')).toBe('public, max-age=30')
+})
+
+test('POST /api/escalate proxies complete QA payload to Railway', async () => {
+  const payload = {
+    leadName: 'QA Lead',
+    leadEmail: 'qa@example.com',
+    intakeSummary: {
+      situation: 'Safe QA path',
+      capabilities: 'Proxy contract',
+      firstStep: 'Suppressed handoff',
+    },
+    escalationReason: 'explicit',
+    sessionId: 'session-qa',
+    timestamp: '2026-07-20T09:00:00Z',
+  }
+  let forwardedUrl = ''
+  let forwardedBody = ''
+  let forwardedHeaders = new Headers()
+
+  globalThis.fetch = async (input, init) => {
+    forwardedUrl = String(input)
+    forwardedBody = String(init?.body)
+    forwardedHeaders = new Headers(init?.headers)
+    return Response.json({
+      success: true,
+      status: 'suppressed',
+      messageId: 'qa-suppressed',
+      error: null,
+    })
+  }
+
+  const response = await escalate({
+    env: { RAILWAY_API_URL: 'https://railway.example/' },
+    request: new Request('https://edstratumlabs.ai/api/escalate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Stratum-QA': 'true',
+        'X-Stratum-Session': 'session-qa',
+      },
+      body: JSON.stringify(payload),
+    }),
+  } as never)
+
+  expect(forwardedUrl).toBe('https://railway.example/api/escalate')
+  expect(forwardedHeaders.get('X-Stratum-QA')).toBe('true')
+  expect(forwardedHeaders.get('X-Stratum-Session')).toBe('session-qa')
+  expect(JSON.parse(forwardedBody)).toEqual(payload)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({
+    success: true,
+    status: 'suppressed',
+    messageId: 'qa-suppressed',
+    error: null,
+  })
+})
+
+test('POST /api/escalate preserves Railway delivery failure status', async () => {
+  globalThis.fetch = async () =>
+    Response.json(
+      {
+        success: false,
+        status: 'failed',
+        messageId: null,
+        error: 'missing_email_config',
+      },
+      { status: 500 },
+    )
+
+  const response = await escalate({
+    env: { RAILWAY_API_URL: 'https://railway.example' },
+    request: new Request('https://edstratumlabs.ai/api/escalate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+  } as never)
+
+  expect(response.status).toBe(500)
+  expect(await response.json()).toEqual({
+    success: false,
+    status: 'failed',
+    messageId: null,
+    error: 'missing_email_config',
+  })
+})
+
+test('POST /api/tts proxies audio stream and session header to Railway', async () => {
+  let forwardedUrl = ''
+  let forwardedBody = ''
+  let forwardedHeaders = new Headers()
+
+  globalThis.fetch = async (input, init) => {
+    forwardedUrl = String(input)
+    forwardedBody = String(init?.body)
+    forwardedHeaders = new Headers(init?.headers)
+    return new Response(new Uint8Array([1, 2, 3]), {
+      status: 200,
+      headers: {
+        'Content-Type': 'audio/mpeg',
+      },
+    })
+  }
+
+  const response = await tts({
+    env: { RAILWAY_API_URL: 'https://railway.example/' },
+    request: new Request('https://edstratumlabs.ai/api/tts', {
+      method: 'POST',
+      headers: {
+        Accept: 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'X-Stratum-Session': 'voice-session',
+      },
+      body: JSON.stringify({ text: 'Hello from STRATUM.' }),
+    }),
+  } as never)
+
+  expect(forwardedUrl).toBe('https://railway.example/api/tts')
+  expect(forwardedHeaders.get('Accept')).toBe('audio/mpeg')
+  expect(forwardedHeaders.get('X-Stratum-Session')).toBe('voice-session')
+  expect(JSON.parse(forwardedBody)).toEqual({ text: 'Hello from STRATUM.' })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Content-Type')).toBe('audio/mpeg')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3])
+})
+
+test('POST /api/tts preserves Railway validation failure response', async () => {
+  globalThis.fetch = async () =>
+    Response.json(
+      { detail: [{ type: 'string_type', loc: ['body', 'text'] }] },
+      { status: 422 },
+    )
+
+  const response = await tts({
+    env: { RAILWAY_API_URL: 'https://railway.example' },
+    request: new Request('https://edstratumlabs.ai/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 5 }),
+    }),
+  } as never)
+
+  expect(response.status).toBe(422)
+  expect(await response.json()).toEqual({
+    detail: [{ type: 'string_type', loc: ['body', 'text'] }],
+  })
 })
 
 async function createPersistedSession(db = new MemoryD1()) {

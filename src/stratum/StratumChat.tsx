@@ -24,7 +24,6 @@ import {
   INTAKE_QUESTIONS,
   PHASE_LABELS,
   PROMPT_CHIPS,
-  STRATUM_API_URL,
   VOICE_CONFIG,
 } from './stratumConfig'
 import { getStratumConfig, streamStratumResponse } from './stratumApi'
@@ -405,7 +404,6 @@ export default function StratumChat() {
     }
 
     const player = new TTSPlayer({
-      apiBaseUrl: STRATUM_API_URL,
       sessionId: () => sessionId,
     })
     ttsPlayerRef.current = player
