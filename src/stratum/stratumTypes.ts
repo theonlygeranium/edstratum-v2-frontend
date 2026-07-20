@@ -41,6 +41,13 @@ export interface ReadinessSnapshot {
   firstStep: string
 }
 
+export interface RuntimeConfig {
+  ragEnabled: boolean
+  voiceEnabled: boolean
+  persistenceEnabled: boolean
+  maxIntakeQuestions: number
+}
+
 export interface IntakeQuestion {
   id: string
   text: string

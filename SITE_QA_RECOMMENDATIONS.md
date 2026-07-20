@@ -51,6 +51,13 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
 - Frontend commits `5955dff` and `371f634` are deployed on Cloudflare Pages production. `371f634` adds a production-host backend fallback for `edstratumlabs.ai` / `www.edstratumlabs.ai` while localhost and branch previews remain mock-mode by default.
 - Live rendered QA on 2026-07-20 verified the production site made one real non-escalation backend request for a RAG chat, displayed citations, and rendered escalation success/failure confirmations through intercepted SSE only, so no live handoff email was sent.
 
+## Feature 3 Branch Status
+
+- Branch `feat/cf-functions` adds Cloudflare Pages Functions for `/api/health`, `/api/config`, and best-effort API rate limiting when KV bindings are available.
+- Local branch QA passed on 2026-07-20: `npm run lint`, `npm run build`, `npx wrangler pages functions build`, `npm test -- --reporter=list` (`54 passed`), plus `wrangler pages dev dist --port 8788` smoke for `/api/config` and `/api/health`.
+- Wrangler is not authenticated in this shell, so KV namespace creation and dashboard binding remain pending: `STRATUM_CONFIG` and `RATE_LIMIT`.
+- Until KV is bound, `/api/config` returns safe default runtime flags and `_middleware.ts` skips rate limiting.
+
 ## Recommended Next Steps
 
 1. Add/verify Cloudflare preview env var `VITE_STRATUM_API_URL` if preview branches should exercise the live backend instead of mock chat.
@@ -60,8 +67,8 @@ The recovered frontend source now includes the STRATUM chatbot under `src/stratu
    - prompt chips submit without forbidden copy
    - escalation copy remains discretion-safe
 3. Keep production `VITE_STRATUM_API_URL` configured in Cloudflare Pages even though the source fallback now protects the live hostname.
-4. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
-5. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
-6. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
-7. Improve the chat control accessibility with Escape-to-close, focus return, and optional transcript reset.
+4. Create and bind Feature 3 KV namespaces in Cloudflare Pages once Wrangler or dashboard credentials are available.
+5. Add a GitHub branch protection rule for `main` requiring `CI / build-and-test`.
+6. Create a staging Pages project or preview environment with a backend CORS origin dedicated to agent QA if branch previews should not use production backend.
+7. Once a scheduling link is provisioned, add scheduling only through an explicit reviewed config flag rather than hardcoded frontend copy.
 8. Add lightweight analytics for chatbot open rate, prompt chip usage, completed readiness checks, and escalation intent without logging sensitive conversation text.

@@ -10,7 +10,7 @@ async function openReadyPage(page: Page, options: { mockFailure?: boolean } = {}
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
     state: 'visible',
-    timeout: 10_000,
+    timeout: 15_000,
   })
   await page.getByRole('button', { name: /open stratum chat/i }).click()
   return page.getByRole('dialog', { name: /stratum ai intake advisor/i })

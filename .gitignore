@@ -24,6 +24,7 @@ Thumbs.db
 
 # Wrangler / Cloudflare
 .wrangler/
+_worker.bundle
 
 # Logs
 *.log

@@ -2,5 +2,8 @@
 # KB4: pages_build_output_dir is correct for Cloudflare Pages
 # Do NOT use [site] bucket — that is the legacy Workers Sites format
 name = "edstratumlabs"
-compatibility_date = "2026-01-01"
+compatibility_date = "2026-07-17"
 pages_build_output_dir = "./dist"
+
+[vars]
+RAILWAY_API_URL = "https://stratum-backend-production-a340.up.railway.app"

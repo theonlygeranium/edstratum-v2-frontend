@@ -18,6 +18,7 @@
     "react-helmet-async": "^3.0.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260719.1",
     "@playwright/test": "^1.45.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^26.1.1",

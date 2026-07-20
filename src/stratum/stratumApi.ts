@@ -6,6 +6,7 @@ import type {
   ProcessingPhase,
   RagCitation,
   ReadinessSnapshot,
+  RuntimeConfig,
   SourceConfidence,
   StratumStreamRequest,
   StreamEvent,
@@ -34,6 +35,13 @@ const ESCALATION_DELIVERY_STATUSES = new Set([
   'rate_limited',
   'suppressed',
 ])
+
+const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  ragEnabled: true,
+  voiceEnabled: false,
+  persistenceEnabled: false,
+  maxIntakeQuestions: 6,
+}
 
 function newSessionId() {
   if (window.crypto?.randomUUID) {
@@ -123,6 +131,37 @@ function normalizeEscalationDelivery(value: unknown): EscalationDelivery | null 
   }
 }
 
+function normalizeRuntimeConfig(value: unknown): RuntimeConfig {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_RUNTIME_CONFIG
+  }
+
+  const config = value as Partial<RuntimeConfig>
+  const maxIntakeQuestions =
+    typeof config.maxIntakeQuestions === 'number' &&
+    Number.isInteger(config.maxIntakeQuestions) &&
+    config.maxIntakeQuestions > 0 &&
+    config.maxIntakeQuestions <= 12
+      ? config.maxIntakeQuestions
+      : DEFAULT_RUNTIME_CONFIG.maxIntakeQuestions
+
+  return {
+    ragEnabled:
+      typeof config.ragEnabled === 'boolean'
+        ? config.ragEnabled
+        : DEFAULT_RUNTIME_CONFIG.ragEnabled,
+    voiceEnabled:
+      typeof config.voiceEnabled === 'boolean'
+        ? config.voiceEnabled
+        : DEFAULT_RUNTIME_CONFIG.voiceEnabled,
+    persistenceEnabled:
+      typeof config.persistenceEnabled === 'boolean'
+        ? config.persistenceEnabled
+        : DEFAULT_RUNTIME_CONFIG.persistenceEnabled,
+    maxIntakeQuestions,
+  }
+}
+
 function normalizeStreamEvent(value: unknown): StreamEvent | null {
   if (!value || typeof value !== 'object') {
     return null
@@ -175,6 +214,41 @@ function parseSseBlock(block: string): StreamEvent | null {
 
   try {
     return normalizeStreamEvent(JSON.parse(data))
+  } catch {
+    return null
+  }
+}
+
+export async function getStratumConfig(options: { signal?: AbortSignal } = {}) {
+  try {
+    const response = await fetch('/api/config', {
+      headers: { Accept: 'application/json' },
+      signal: options.signal,
+    })
+    if (!response.ok) {
+      return DEFAULT_RUNTIME_CONFIG
+    }
+
+    return normalizeRuntimeConfig(await response.json())
+  } catch {
+    return DEFAULT_RUNTIME_CONFIG
+  }
+}
+
+export async function getStratumHealth(options: { signal?: AbortSignal } = {}) {
+  try {
+    const response = await fetch('/api/health', {
+      headers: {
+        Accept: 'application/json',
+        'X-Stratum-Session': getSessionId(),
+      },
+      signal: options.signal,
+    })
+    if (!response.ok) {
+      return null
+    }
+
+    return (await response.json()) as Record<string, unknown>
   } catch {
     return null
   }

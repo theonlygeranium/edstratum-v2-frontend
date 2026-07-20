@@ -12,6 +12,7 @@ React 19 + Vite 6 + Tailwind CSS v4 SPA deployed to Cloudflare Pages at [edstrat
 | Animation | `motion/react` v12 — `LazyMotion` + `m.*` strict mode |
 | SEO | `react-helmet-async` + static JSON-LD in `index.html` |
 | Deployment | Cloudflare Pages (direct upload via Wrangler) |
+| Edge API | Cloudflare Pages Functions under `functions/` |
 
 ## Local Development
 
@@ -53,6 +54,7 @@ chmod +x deploy.sh
 - **Motion constraint**: `LazyMotion strict` is set at the app root. Only `m.*` components (from `motion/react-m`) are permitted inside the tree. Bare `motion.div` etc. will throw at runtime.
 - **Design tokens**: All color, typography, and spacing tokens are defined in `src/index.css` under `@theme {}`. No `tailwind.config.js` exists.
 - **STRATUM chat**: The floating intake advisor lives in `src/stratum/`. It uses `VITE_STRATUM_API_URL` to stream `/api/chat` SSE events from Railway. If the URL is omitted outside the production hostnames, it falls back to the local demo stream and does not send escalation emails.
+- **Pages Functions**: `/api/health` proxies Railway `/api/health`, `/api/config` returns non-secret runtime flags, and `_middleware.ts` applies best-effort KV rate limiting when the `RATE_LIMIT` binding exists.
 - **Escalation discretion**: Client-facing copy should refer to the `Founding leadership team` until the backend confirms that a notification has been sent. Do not add personal names or scheduling links in the frontend unless they are explicitly provisioned and approved.
 - **Deployment note**: This repo is now the frontend source of truth. The previous Cloudflare Pages deployment was a direct-upload artifact-only deploy (no Git integration). Connect this repo to Cloudflare Pages via the dashboard or continue using `deploy.sh` for direct uploads.
 
@@ -88,4 +90,7 @@ public/
   sitemap.xml
   _headers                 # Cloudflare Pages security headers
   _redirects               # SPA fallback: /* -> /index.html 200
+functions/
+  api/                      # Cloudflare Pages Functions API routes
+  _middleware.ts            # API middleware and optional KV rate limiting
 ```

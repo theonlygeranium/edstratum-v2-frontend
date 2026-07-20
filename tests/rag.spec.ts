@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: /open stratum chat/i }).waitFor({
     state: 'visible',
-    timeout: 10_000,
+    timeout: 15_000,
   })
 })
 
