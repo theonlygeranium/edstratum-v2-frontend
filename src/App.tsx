@@ -68,6 +68,7 @@ const About    = lazy(() => import('./sections/About'))
 const FAQ      = lazy(() => import('./sections/FAQ'))
 const Contact  = lazy(() => import('./sections/Contact'))
 const Footer   = lazy(() => import('./sections/Footer'))
+const StratumChat = lazy(() => import('./stratum/StratumChat'))
 
 /* ── Async feature loader — defers 15KB domAnimation bundle
    until after hydration (4.6KB initial vs 34KB bare motion) ── */
@@ -158,6 +159,10 @@ export default function App() {
 
           <Suspense fallback={null}>
             <Footer />
+          </Suspense>
+
+          <Suspense fallback={null}>
+            <StratumChat />
           </Suspense>
 
         </div>
