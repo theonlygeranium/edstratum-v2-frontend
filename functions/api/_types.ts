@@ -9,6 +9,8 @@ export interface Env {
   RAILWAY_API_URL?: string
   STRATUM_CONFIG?: KVNamespace
   RATE_LIMIT?: KVNamespace
+  STRATUM_DB?: D1Database
+  SESSION_SECRET?: string
 }
 
 export const DEFAULT_RAILWAY_API_URL =

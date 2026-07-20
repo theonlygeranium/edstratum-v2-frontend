@@ -1,4 +1,5 @@
-import { STRATUM_API_URL, STRATUM_BACKEND_ENABLED, STRATUM_SESSION_KEY } from './stratumConfig'
+import { getOrCreateSessionId } from '../lib/stratumSession'
+import { STRATUM_API_URL, STRATUM_BACKEND_ENABLED } from './stratumConfig'
 import { mockStreamResponse } from './stratumMock'
 import type {
   EscalationDelivery,
@@ -43,27 +44,8 @@ const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   maxIntakeQuestions: 6,
 }
 
-function newSessionId() {
-  if (window.crypto?.randomUUID) {
-    return window.crypto.randomUUID()
-  }
-
-  return `stratum-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
 export function getSessionId() {
-  try {
-    const current = window.sessionStorage.getItem(STRATUM_SESSION_KEY)
-    if (current) {
-      return current
-    }
-
-    const next = newSessionId()
-    window.sessionStorage.setItem(STRATUM_SESSION_KEY, next)
-    return next
-  } catch {
-    return newSessionId()
-  }
+  return getOrCreateSessionId()
 }
 
 function isSource(value: unknown): value is SourceConfidence {

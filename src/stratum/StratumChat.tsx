@@ -3,6 +3,14 @@ import * as m from 'motion/react-m'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { transitions } from '../lib/motionVariants'
 import { detectSentiment, type SentimentSignal } from '../lib/sentimentSignal'
+import {
+  clearPersistentSession,
+  getOrCreateSessionId,
+  initializePersistentSession,
+  loadMessagesFromBackend,
+  syncMessageToBackend,
+  updateSessionFlags,
+} from '../lib/stratumSession'
 import { trackEvent } from '../lib/stratumAnalytics'
 import {
   ESCALATION_REQUEST_TEXT,
@@ -11,7 +19,7 @@ import {
   PHASE_LABELS,
   PROMPT_CHIPS,
 } from './stratumConfig'
-import { getSessionId, streamStratumResponse } from './stratumApi'
+import { getStratumConfig, streamStratumResponse } from './stratumApi'
 import { sentimentTestMode } from './stratumMock'
 import type {
   ChatMessage,
@@ -21,11 +29,18 @@ import type {
   ProcessingPhase,
   RagCitation,
   ReadinessSnapshot,
+  RuntimeConfig,
   SentimentEscalationSignal,
   SourceConfidence,
 } from './stratumTypes'
 
 const SENTIMENT_ESCALATION_COOLDOWN_MS = 10 * 60 * 1000
+const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  ragEnabled: true,
+  voiceEnabled: false,
+  persistenceEnabled: false,
+  maxIntakeQuestions: 6,
+}
 
 type StreamAssistantOptions = {
   escalationTrigger?: Exclude<EscalationTrigger, null>
@@ -238,9 +253,12 @@ export default function StratumChat() {
   const [snapshot, setSnapshot] = useState<ReadinessSnapshot | null>(null)
   const [escalation, setEscalation] = useState<Exclude<EscalationTrigger, null> | null>(null)
   const [sentimentEscalationFired, setSentimentEscalationFired] = useState(false)
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(DEFAULT_RUNTIME_CONFIG)
+  const [sessionId, setSessionId] = useState(() => getOrCreateSessionId())
   const messagesRef = useRef(messages)
   const lastSentimentSignalRef = useRef<SentimentSignal>('neutral')
   const lastEscalationAtRef = useRef<number | null>(null)
+  const persistenceHydratedRef = useRef(false)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Accessibility: refs for focus management
@@ -250,6 +268,47 @@ export default function StratumChat() {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void getStratumConfig({ signal: controller.signal }).then((config) => {
+      if (!controller.signal.aborted) {
+        setRuntimeConfig(config)
+      }
+    })
+
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!runtimeConfig.persistenceEnabled || persistenceHydratedRef.current) {
+      return
+    }
+
+    let cancelled = false
+    persistenceHydratedRef.current = true
+
+    void (async () => {
+      const session = await initializePersistentSession()
+      if (!session || cancelled) {
+        return
+      }
+
+      setSessionId(session.sessionId)
+      const restored = await loadMessagesFromBackend(session.sessionId)
+      if (cancelled || restored.length === 0) {
+        return
+      }
+
+      if (messagesRef.current.length === 1) {
+        setMessages([assistantMessage(INITIAL_GREETING), ...restored])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [runtimeConfig.persistenceEnabled])
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({
@@ -305,13 +364,39 @@ export default function StratumChat() {
     lastSentimentSignalRef.current = 'neutral'
     lastEscalationAtRef.current = null
     setActivePhases([])
+    if (runtimeConfig.persistenceEnabled) {
+      clearPersistentSession()
+      void initializePersistentSession().then((session) => {
+        if (session) {
+          setSessionId(session.sessionId)
+        }
+      })
+    }
     trackEvent('transcript_reset')
     // Return focus to input after reset
     window.setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  const appendMessage = (message: ChatMessage) => {
+  function persistMessage(message: ChatMessage) {
+    if (runtimeConfig.persistenceEnabled) {
+      void syncMessageToBackend(sessionId, message)
+    }
+  }
+
+  function persistSessionFlags(flags: { escalated?: boolean; intakeComplete?: boolean }) {
+    if (runtimeConfig.persistenceEnabled) {
+      void updateSessionFlags(sessionId, flags)
+    }
+  }
+
+  const appendMessage = (
+    message: ChatMessage,
+    options: { persist?: boolean } = {},
+  ) => {
     setMessages((current) => [...current, message])
+    if (options.persist !== false) {
+      persistMessage(message)
+    }
   }
 
   const patchMessage = (id: string, patch: Partial<ChatMessage> | ((message: ChatMessage) => ChatMessage)) => {
@@ -382,18 +467,26 @@ export default function StratumChat() {
   ) {
     const responseId = createId('assistant')
     const controller = new AbortController()
+    let assistantDraft: ChatMessage = {
+      id: responseId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+    }
+    let assistantPersisted = false
+    const persistAssistantDraft = () => {
+      if (!assistantPersisted && assistantDraft.content.trim().length > 0) {
+        assistantPersisted = true
+        persistMessage(assistantDraft)
+      }
+    }
     abortRef.current = controller
 
     setPending(true)
     setActivePhases([])
     setSnapshot(null)
     setEscalation(null)
-    appendMessage({
-      id: responseId,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-    })
+    appendMessage(assistantDraft, { persist: false })
 
     try {
       for await (const event of streamStratumResponse(
@@ -402,7 +495,7 @@ export default function StratumChat() {
           mode: requestMode,
           intakeIndex: nextIntakeIndex,
           intakeAnswers: nextIntakeAnswers,
-          sessionId: getSessionId(),
+          sessionId,
           ...options,
         },
         { signal: controller.signal },
@@ -411,6 +504,10 @@ export default function StratumChat() {
           setActivePhases((current) =>
             current.includes(event.phase) ? current : [...current, event.phase],
           )
+          assistantDraft = {
+            ...assistantDraft,
+            phases: [...(assistantDraft.phases ?? []), event.phase],
+          }
           patchMessage(responseId, (message) => ({
             ...message,
             phases: [...(message.phases ?? []), event.phase],
@@ -418,14 +515,20 @@ export default function StratumChat() {
         }
 
         if (event.type === 'source') {
+          assistantDraft = { ...assistantDraft, source: event.source }
           patchMessage(responseId, { source: event.source })
         }
 
         if (event.type === 'citations') {
+          assistantDraft = { ...assistantDraft, citations: event.data }
           patchMessage(responseId, { citations: event.data })
         }
 
         if (event.type === 'token') {
+          assistantDraft = {
+            ...assistantDraft,
+            content: `${assistantDraft.content}${event.token}`,
+          }
           patchMessage(responseId, (message) => ({
             ...message,
             content: `${message.content}${event.token}`,
@@ -438,33 +541,44 @@ export default function StratumChat() {
           setEscalation(event.escalate ?? null)
           if (event.snapshot) {
             trackEvent('intake_completed')
+            persistSessionFlags({ intakeComplete: true })
           }
           if (event.escalate) {
             lastEscalationAtRef.current = Date.now()
             if (event.escalate === 'sentiment') {
               setSentimentEscalationFired(true)
             }
+            persistSessionFlags({ escalated: true })
             trackEvent('escalation_triggered', { trigger: event.escalate })
             const confirmation = escalationConfirmation(event.escalation)
             if (confirmation) {
               appendMessage(systemMessage(confirmation))
             }
           }
+          persistAssistantDraft()
         }
 
         if (event.type === 'error') {
           setActivePhases([])
+          assistantDraft = { ...assistantDraft, content: event.message }
           patchMessage(responseId, { content: event.message })
+          persistAssistantDraft()
           break
         }
       }
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError') {
+        assistantDraft = {
+          ...assistantDraft,
+          content: 'STRATUM hit a temporary issue. Please try again in a moment.',
+        }
         patchMessage(responseId, {
           content: 'STRATUM hit a temporary issue. Please try again in a moment.',
         })
+        persistAssistantDraft()
       }
     } finally {
+      persistAssistantDraft()
       setPending(false)
       abortRef.current = null
       if (requestMode !== 'intake') {

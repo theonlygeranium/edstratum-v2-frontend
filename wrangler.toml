@@ -7,3 +7,11 @@ pages_build_output_dir = "./dist"
 
 [vars]
 RAILWAY_API_URL = "https://stratum-backend-production-a340.up.railway.app"
+
+# Feature 5 D1 persistence bindings. Uncomment and replace database_id after
+# creating the Cloudflare D1 database named `stratum-conversations`.
+# Also add SESSION_SECRET in Cloudflare Pages environment variables.
+# [[d1_databases]]
+# binding = "STRATUM_DB"
+# database_name = "stratum-conversations"
+# database_id = "<D1_DATABASE_ID>"
