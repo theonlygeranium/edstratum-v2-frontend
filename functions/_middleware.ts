@@ -130,5 +130,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ),
   )
 
-  return context.next()
+  const response = await context.next()
+  response.headers.set('X-RateLimit-Count', String(updated.count))
+  response.headers.set('X-RateLimit-Limit', String(API_RATE_LIMIT))
+  response.headers.set('X-RateLimit-Window', String(window.id))
+  response.headers.set('X-RateLimit-Source', cached ? 'cache' : 'kv')
+  response.headers.set('X-RateLimit-Key', kvKey)
+  return response
 }
