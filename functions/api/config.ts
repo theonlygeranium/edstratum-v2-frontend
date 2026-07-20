@@ -15,14 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   }
 
   try {
-    // cacheTtl: 0 bypasses Cloudflare's default 60-second edge read cache,
-    // ensuring the endpoint always serves the latest KV value. Without this,
-    // runtime flag changes (e.g. persistenceEnabled) can take minutes to
-    // propagate across multiple colos due to anycast distribution.
-    const config = await env.STRATUM_CONFIG.get('runtime', {
-      type: 'json',
-      cacheTtl: 0,
-    })
+    const config = await env.STRATUM_CONFIG.get('runtime', { type: 'json' })
     return jsonResponse(runtimeConfig(config), {
       headers: {
         'Cache-Control': 'public, max-age=30',
