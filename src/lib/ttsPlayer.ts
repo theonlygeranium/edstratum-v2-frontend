@@ -2,7 +2,6 @@ import { VOICE_CONFIG } from '../stratum/stratumConfig'
 import { getOrCreateSessionId } from './stratumSession'
 
 const TTS_STORAGE_KEY = 'stratum_tts_enabled'
-const TTS_TEST_OVERRIDE_KEY = 'stratum_tts_test_enabled'
 
 type AudioContextConstructor = new () => AudioContext
 
@@ -260,19 +259,11 @@ export class TTSPlayer {
 }
 
 export function ttsFeatureFlagEnabled() {
-  if (import.meta.env.VITE_TTS_ENABLED === 'true') {
-    return true
-  }
-
-  if (typeof window === 'undefined' || window.location.hostname !== 'localhost') {
-    return false
-  }
-
-  try {
-    return window.localStorage.getItem(TTS_TEST_OVERRIDE_KEY) === 'true'
-  } catch {
-    return false
-  }
+  // The STRATUM_CONFIG KV namespace (voiceEnabled flag) is the sole
+  // runtime gatekeeper for TTS. The build-time VITE_TTS_ENABLED env var
+  // has been retired because it requires a site rebuild to take effect,
+  // whereas KV can be toggled at runtime without redeploying.
+  return true
 }
 
 export function sanitizeTTSInput(
