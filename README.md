@@ -120,7 +120,7 @@ public/
   robots.txt
   sitemap.xml
   _headers                 # Cloudflare Pages security headers
-  _redirects               # SPA fallback: /* -> /index.html 200
+  404.html                 # Real 404 so missing hashed assets do not fall through to index.html
 functions/
   api/                      # Cloudflare Pages Functions API routes
   _middleware.ts            # API middleware and optional KV rate limiting

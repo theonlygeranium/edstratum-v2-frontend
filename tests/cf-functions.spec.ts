@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 import { onRequest as middleware } from '../functions/_middleware'
 import { onRequestGet as config } from '../functions/api/config'
@@ -292,6 +292,16 @@ test('security headers allow same-origin microphone only for voice readiness', (
   expect(headers).toContain('Permissions-Policy:')
   expect(headers).toContain('microphone=(self)')
   expect(headers).not.toContain('microphone=()')
+})
+
+test('static asset misses cannot fall through to SPA index HTML', () => {
+  const redirectsPath = new URL('../public/_redirects', import.meta.url)
+  const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
+  const notFound = readFileSync(new URL('../public/404.html', import.meta.url), 'utf8')
+
+  expect(existsSync(redirectsPath)).toBe(false)
+  expect(headers).not.toMatch(/^\/assets\/\*/m)
+  expect(notFound).toContain('Page Not Found')
 })
 
 test('rate limiter returns 429 after 60 rapid requests', async () => {
