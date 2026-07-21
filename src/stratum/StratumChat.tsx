@@ -325,6 +325,17 @@ export default function StratumChat() {
     messagesRef.current = messages
   }, [messages])
 
+  // Allow external links (e.g. footer "Talk with our AI Intake Advisor") to
+  // open the chatbot by dispatching a CustomEvent.
+  useEffect(() => {
+    function handleOpenChat() {
+      setOpen(true)
+      trackEvent('chatbot_opened', { source: 'external_link' })
+    }
+    window.addEventListener('stratum:open-chat', handleOpenChat)
+    return () => window.removeEventListener('stratum:open-chat', handleOpenChat)
+  }, [])
+
   useEffect(() => {
     const controller = new AbortController()
     void getStratumConfig({ signal: controller.signal }).then((config) => {
