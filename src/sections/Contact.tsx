@@ -227,6 +227,10 @@ export default function Contact() {
               hello@edstratumlabs.ai
             </m.a>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
+            <m.a href="tel:+14153012306" whileHover={{ color: 'var(--color-primary-light)', transition: transitions.micro }} className="text-text-accent hover:text-primary-light transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-primary rounded outline-none" rel="noopener">
+              415-301-2306
+            </m.a>
+            <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span>Typical response: {'<'} 1 business day</span>
           </m.div>
         </div>
