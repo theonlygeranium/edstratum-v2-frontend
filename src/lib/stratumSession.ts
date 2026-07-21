@@ -16,6 +16,9 @@ interface PersistedMessage {
   content?: unknown
   timestamp?: unknown
   citations?: unknown
+  source?: unknown
+  phases?: unknown
+  isIntakeQuestion?: unknown
 }
 
 function newSessionId() {
@@ -68,6 +71,50 @@ function authHeaders(sessionToken: string) {
   }
 }
 
+function normalizeSource(value: unknown): ChatMessage['source'] | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const source = value as Record<string, unknown>
+  if (
+    typeof source.label !== 'string' ||
+    typeof source.score !== 'number' ||
+    typeof source.grounded !== 'boolean'
+  ) {
+    return undefined
+  }
+
+  return {
+    label: source.label,
+    score: source.score,
+    grounded: source.grounded,
+    stale: source.stale === true,
+  }
+}
+
+function normalizePhases(value: unknown): ChatMessage['phases'] {
+  const allowed = new Set(['searching', 'retrieving', 'composing', 'assessing', 'escalating', 'idle'])
+  return Array.isArray(value)
+    ? value.filter((phase): phase is NonNullable<ChatMessage['phases']>[number] =>
+        typeof phase === 'string' && allowed.has(phase),
+      )
+    : []
+}
+
+function normalizeCitations(value: unknown): ChatMessage['citations'] {
+  return Array.isArray(value)
+    ? value.filter((citation) => {
+        if (!citation || typeof citation !== 'object') {
+          return false
+        }
+
+        const candidate = citation as Record<string, unknown>
+        return typeof candidate.source === 'string' && typeof candidate.excerpt === 'string'
+      }) as ChatMessage['citations']
+    : []
+}
+
 function normalizePersistedMessage(message: PersistedMessage): ChatMessage | null {
   if (
     message.role !== 'user' &&
@@ -89,16 +136,10 @@ function normalizePersistedMessage(message: PersistedMessage): ChatMessage | nul
       typeof message.timestamp === 'number' && Number.isFinite(message.timestamp)
         ? message.timestamp
         : Date.now(),
-    citations: Array.isArray(message.citations)
-      ? message.citations.filter((citation) => {
-          if (!citation || typeof citation !== 'object') {
-            return false
-          }
-
-          const candidate = citation as Record<string, unknown>
-          return typeof candidate.source === 'string' && typeof candidate.excerpt === 'string'
-        }) as ChatMessage['citations']
-      : [],
+    source: normalizeSource(message.source),
+    phases: normalizePhases(message.phases),
+    isIntakeQuestion: message.isIntakeQuestion === true,
+    citations: normalizeCitations(message.citations),
   }
 }
 

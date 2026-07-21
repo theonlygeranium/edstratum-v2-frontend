@@ -19,8 +19,6 @@ export type EscalationTrigger =
 
 export type SentimentEscalationSignal = 'frustration' | 'urgency'
 
-export type EscalationStatus = 'idle' | 'sending' | 'sent' | 'failed'
-
 export interface EscalationDelivery {
   success: boolean
   status: 'sent' | 'prepared' | 'failed' | 'rate_limited' | 'suppressed'
@@ -32,6 +30,7 @@ export interface SourceConfidence {
   label: string
   score: number
   grounded: boolean
+  stale?: boolean
 }
 
 export interface RagCitation {

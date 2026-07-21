@@ -13,6 +13,7 @@ interface StoredMessage {
   role: MessageRole
   content: string
   citations_json: string | null
+  metadata_json: string | null
   created_at: number
 }
 
@@ -22,6 +23,9 @@ interface MessageInput {
   content?: unknown
   timestamp?: unknown
   citations?: unknown
+  source?: unknown
+  phases?: unknown
+  isIntakeQuestion?: unknown
 }
 
 const MAX_CONTENT_LENGTH = 16_000
@@ -138,6 +142,56 @@ function normalizeCitations(value: unknown) {
   return citations.length > 0 ? JSON.stringify(citations) : null
 }
 
+function normalizeSource(value: unknown) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Record<string, unknown>
+  if (
+    typeof source.label !== 'string' ||
+    typeof source.score !== 'number' ||
+    typeof source.grounded !== 'boolean'
+  ) {
+    return null
+  }
+
+  return {
+    label: source.label,
+    score: source.score,
+    grounded: source.grounded,
+    stale: source.stale === true,
+  }
+}
+
+function normalizePhases(value: unknown) {
+  const allowed = new Set(['searching', 'retrieving', 'composing', 'assessing', 'escalating', 'idle'])
+  return Array.isArray(value)
+    ? value.filter((phase): phase is string => typeof phase === 'string' && allowed.has(phase))
+    : []
+}
+
+function normalizeMetadata(candidate: MessageInput) {
+  return JSON.stringify({
+    source: normalizeSource(candidate.source),
+    phases: normalizePhases(candidate.phases),
+    isIntakeQuestion: candidate.isIntakeQuestion === true,
+  })
+}
+
+function parseJsonObject(value: string | null) {
+  if (!value) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
 function normalizeMessage(input: unknown): StoredMessage | null {
   if (!input || typeof input !== 'object') {
     return null
@@ -167,6 +221,7 @@ function normalizeMessage(input: unknown): StoredMessage | null {
     role: candidate.role,
     content: candidate.content.slice(0, MAX_CONTENT_LENGTH),
     citations_json: normalizeCitations(candidate.citations),
+    metadata_json: normalizeMetadata(candidate),
     created_at: createdAt,
   }
 }
@@ -321,20 +376,26 @@ async function listMessages(request: Request, env: Env, sessionId: string) {
   }
 
   const result = await env.STRATUM_DB!.prepare(
-    'SELECT id, role, content, citations_json, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC',
+    'SELECT id, role, content, citations_json, metadata_json, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC',
   )
     .bind(sessionId)
     .all<Omit<StoredMessage, 'session_id'>>()
 
   return jsonResponse({
     sessionId,
-    messages: (result.results || []).map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      timestamp: message.created_at,
-      citations: message.citations_json ? JSON.parse(message.citations_json) : [],
-    })),
+    messages: (result.results || []).map((message) => {
+      const metadata = parseJsonObject(message.metadata_json)
+      return {
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        timestamp: message.created_at,
+        citations: message.citations_json ? JSON.parse(message.citations_json) : [],
+        source: normalizeSource(metadata.source) ?? undefined,
+        phases: normalizePhases(metadata.phases),
+        isIntakeQuestion: metadata.isIntakeQuestion === true,
+      }
+    }),
   })
 }
 
@@ -359,7 +420,7 @@ async function appendMessages(request: Request, env: Env, sessionId: string) {
 
   for (const message of messages) {
     await env.STRATUM_DB!.prepare(
-      'INSERT OR REPLACE INTO messages (id, session_id, role, content, citations_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO messages (id, session_id, role, content, citations_json, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
       .bind(
         message.id,
@@ -367,6 +428,7 @@ async function appendMessages(request: Request, env: Env, sessionId: string) {
         message.role,
         message.content,
         message.citations_json,
+        message.metadata_json,
         message.created_at,
       )
       .run()

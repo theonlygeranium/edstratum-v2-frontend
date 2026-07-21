@@ -205,6 +205,20 @@ test('prompt chip click submits without error', async ({ page }) => {
   }
 })
 
+test('about prompt chip uses the about advisor mode', async ({ page }) => {
+  await page.getByRole('button', { name: /open stratum chat/i }).click()
+  const dialog = page.getByRole('dialog', { name: /stratum ai intake advisor/i })
+
+  await dialog.getByRole('button', { name: /about edstratum labs/i }).click()
+
+  await expect(dialog.locator('.bg-primary.text-white').filter({ hasText: /about edstratum labs/i })).toBeVisible({
+    timeout: 5_000,
+  })
+  await expect(dialog.getByText(/founder-led AI strategy and implementation consultancy/i)).toBeVisible({
+    timeout: 15_000,
+  })
+})
+
 test('readiness check asks all seven SOT intake questions before snapshot', async ({ page }) => {
   await completeSotReadinessFlow(page)
 })

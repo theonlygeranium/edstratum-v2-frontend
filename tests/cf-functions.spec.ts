@@ -97,6 +97,7 @@ interface MessageRow {
   role: 'user' | 'assistant' | 'system'
   content: string
   citations_json: string | null
+  metadata_json?: string | null
   created_at: number
 }
 
@@ -125,7 +126,7 @@ class MemoryD1Statement {
 
   async all<T>() {
     this.db.calls.push({ query: this.query, values: this.values })
-    if (this.query.startsWith('SELECT id, role, content, citations_json, created_at FROM messages')) {
+    if (this.query.startsWith('SELECT id, role, content, citations_json')) {
       const sessionId = String(this.values[0])
       return {
         results: [...this.db.messages.values()]
@@ -174,13 +175,14 @@ class MemoryD1Statement {
     }
 
     if (this.query.startsWith('INSERT OR REPLACE INTO messages')) {
-      const [id, sessionId, role, content, citationsJson, createdAt] = this.values
+      const [id, sessionId, role, content, citationsJson, metadataJson, createdAt] = this.values
       this.db.messages.set(String(id), {
         id: String(id),
         session_id: String(sessionId),
         role: role as MessageRow['role'],
         content: String(content),
         citations_json: citationsJson === null ? null : String(citationsJson),
+        metadata_json: metadataJson === null ? null : String(metadataJson),
         created_at: Number(createdAt),
       })
     }
@@ -982,6 +984,9 @@ test('POST and GET /api/sessions/:id/messages round-trip message history', async
             content: 'Here is a source.',
             timestamp: 20,
             citations: [{ source: 'KB', excerpt: 'Evidence' }],
+            source: { label: 'KB', score: 0.92, grounded: true },
+            phases: ['searching', 'retrieving', 'composing'],
+            isIntakeQuestion: true,
           },
         ],
       }),
@@ -1010,6 +1015,8 @@ test('POST and GET /api/sessions/:id/messages round-trip message history', async
         content: 'Hello',
         timestamp: 10,
         citations: [],
+        phases: [],
+        isIntakeQuestion: false,
       },
       {
         id: 'assistant-1',
@@ -1017,6 +1024,9 @@ test('POST and GET /api/sessions/:id/messages round-trip message history', async
         content: 'Here is a source.',
         timestamp: 20,
         citations: [{ source: 'KB', excerpt: 'Evidence' }],
+        source: { label: 'KB', score: 0.92, grounded: true, stale: false },
+        phases: ['searching', 'retrieving', 'composing'],
+        isIntakeQuestion: true,
       },
     ],
   })

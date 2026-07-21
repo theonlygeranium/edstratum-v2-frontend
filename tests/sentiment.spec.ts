@@ -85,6 +85,31 @@ test('neutral messages do not trigger sentiment escalation', async ({ page }) =>
   await expect(dialog.getByText(/running into some friction/i)).toHaveCount(0)
 })
 
+test("negated frustration terms don't trigger a handoff prompt", async ({ page }) => {
+  const dialog = await openChat(page)
+
+  await sendMessage(dialog, "I don't hate it.")
+  await expect(dialog.getByText(/grounded AI implementation questions/i)).toBeVisible({
+    timeout: 15_000,
+  })
+
+  await sendMessage(dialog, "It is not useless for our Canvas planning.")
+  await expect(dialog.getByText(/running into some friction/i)).toHaveCount(0)
+  await expect(dialog.getByText(/Leadership handoff/i)).toHaveCount(0)
+})
+
+test("negated urgency terms don't trigger automatic escalation", async ({ page }) => {
+  const dialog = await openChat(page)
+
+  await sendMessage(dialog, 'This is not urgent and there is no deadline today.')
+  await expect(dialog.getByText(/grounded AI implementation questions/i)).toBeVisible({
+    timeout: 15_000,
+  })
+
+  await expect(dialog.getByText(/time-sensitive/i)).toHaveCount(0)
+  await expect(dialog.getByText(/Leadership handoff/i)).toHaveCount(0)
+})
+
 test('urgency escalation request includes sentiment payload', async ({ page }) => {
   const dialog = await openChat(page, { sentimentTestMode: true })
 

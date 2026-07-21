@@ -175,6 +175,9 @@ test('page refresh with existing session ID restores conversation', async ({ pag
         role: 'assistant',
         content: 'Here is the restored readiness context.',
         timestamp: 20,
+        source: { label: 'Restored KB', score: 0.88, grounded: true, stale: true },
+        phases: ['searching', 'retrieving', 'composing'],
+        citations: [{ source: 'Restored KB', excerpt: 'Restored evidence.' }],
       },
     ],
   }))
@@ -185,6 +188,9 @@ test('page refresh with existing session ID restores conversation', async ({ pag
     timeout: 10_000,
   })
   await expect(dialog.getByText('Here is the restored readiness context.')).toBeVisible()
+  await expect(dialog.getByText(/Source: Restored KB/i)).toBeVisible()
+  await expect(dialog.getByText(/Information may be dated/i)).toBeVisible()
+  await expect(dialog.getByRole('button', { name: /1 source/i })).toBeVisible()
 })
 
 test('persistence disabled: no API calls to session endpoints', async ({ page }) => {

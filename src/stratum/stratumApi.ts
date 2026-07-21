@@ -1,5 +1,6 @@
 import { getOrCreateSessionId } from '../lib/stratumSession'
 import {
+  DEFAULT_RUNTIME_CONFIG,
   MAX_INTAKE_QUESTIONS,
   STRATUM_API_URL,
   STRATUM_BACKEND_ENABLED,
@@ -41,13 +42,6 @@ const ESCALATION_DELIVERY_STATUSES = new Set([
   'suppressed',
 ])
 
-const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
-  ragEnabled: true,
-  voiceEnabled: false,
-  persistenceEnabled: false,
-  maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
-}
-
 export function getSessionId() {
   return getOrCreateSessionId()
 }
@@ -61,7 +55,8 @@ function isSource(value: unknown): value is SourceConfidence {
   return (
     typeof source.label === 'string' &&
     typeof source.score === 'number' &&
-    typeof source.grounded === 'boolean'
+    typeof source.grounded === 'boolean' &&
+    (source.stale === undefined || typeof source.stale === 'boolean')
   )
 }
 
@@ -211,25 +206,6 @@ export async function getStratumConfig(options: { signal?: AbortSignal } = {}) {
     return normalizeRuntimeConfig(await response.json())
   } catch {
     return DEFAULT_RUNTIME_CONFIG
-  }
-}
-
-export async function getStratumHealth(options: { signal?: AbortSignal } = {}) {
-  try {
-    const response = await fetch('/api/health', {
-      headers: {
-        Accept: 'application/json',
-        'X-Stratum-Session': getSessionId(),
-      },
-      signal: options.signal,
-    })
-    if (!response.ok) {
-      return null
-    }
-
-    return (await response.json()) as Record<string, unknown>
-  } catch {
-    return null
   }
 }
 

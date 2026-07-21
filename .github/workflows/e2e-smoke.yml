@@ -1,0 +1,43 @@
+name: E2E Smoke
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: STRATUM live smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      STRATUM_E2E_BACKEND_URL: https://stratum-backend-production-a340.up.railway.app
+      STRATUM_E2E: 'true'
+      VITE_STRATUM_API_URL: https://stratum-backend-production-a340.up.railway.app
+      VITE_STRATUM_QA: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build QA frontend
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run STRATUM e2e smoke
+        run: npx playwright test tests/e2e/smoke.spec.ts --project='Desktop Chrome' --reporter=list

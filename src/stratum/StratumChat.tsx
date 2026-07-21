@@ -21,10 +21,11 @@ import {
 } from '../lib/voiceInput'
 import {
   ESCALATION_REQUEST_TEXT,
+  DEFAULT_RUNTIME_CONFIG,
   INITIAL_GREETING,
   INTAKE_QUESTIONS,
-  MAX_INTAKE_QUESTIONS,
   PHASE_LABELS,
+  PROMPT_CHIP_ANALYTICS,
   PROMPT_CHIPS,
   VOICE_CONFIG,
 } from './stratumConfig'
@@ -45,19 +46,6 @@ import type {
 } from './stratumTypes'
 
 const SENTIMENT_ESCALATION_COOLDOWN_MS = 10 * 60 * 1000
-const PROMPT_CHIP_ANALYTICS: Record<string, string> = {
-  'Does AI make sense for my Canvas environment?': 'canvas_ai',
-  'What does an EdStratum engagement look like?': 'engagement_shape',
-  'Run a quick AI readiness check': 'readiness_check',
-  "AI strategy vs. AI implementation - what's the difference?": 'strategy_vs_implementation',
-  'Connect with the Founding leadership team': 'founding_leadership',
-}
-const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
-  ragEnabled: true,
-  voiceEnabled: false,
-  persistenceEnabled: false,
-  maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
-}
 
 type StreamAssistantOptions = {
   escalationTrigger?: Exclude<EscalationTrigger, null>
@@ -181,6 +169,9 @@ function SourceBadge({ source }: { source: SourceConfidence }) {
   return (
     <div className="mt-2 rounded-md border border-border bg-background/70 px-2.5 py-1.5 text-[11px] leading-snug text-text-muted">
       Source: {source.label} - confidence {Math.round(source.score * 100)}%
+      {source.stale ? (
+        <span className="mt-1 block text-amber-700">Information may be dated</span>
+      ) : null}
     </div>
   )
 }

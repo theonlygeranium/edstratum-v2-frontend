@@ -1,4 +1,4 @@
-import type { IntakeQuestion, ProcessingPhase } from './stratumTypes'
+import type { IntakeQuestion, ProcessingPhase, RuntimeConfig } from './stratumTypes'
 
 const PRODUCTION_HOSTS = new Set(['edstratumlabs.ai', 'www.edstratumlabs.ai'])
 
@@ -66,6 +66,10 @@ export const PROMPT_CHIPS = [
     mode: 'intake',
   },
   {
+    label: 'About EdStratum Labs',
+    mode: 'about',
+  },
+  {
     label: "AI strategy vs. AI implementation - what's the difference?",
     mode: 'open',
   },
@@ -115,6 +119,22 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
 ]
 
 export const MAX_INTAKE_QUESTIONS = INTAKE_QUESTIONS.length
+
+export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  ragEnabled: true,
+  voiceEnabled: false,
+  persistenceEnabled: false,
+  maxIntakeQuestions: MAX_INTAKE_QUESTIONS,
+}
+
+export const PROMPT_CHIP_ANALYTICS: Record<string, string> = {
+  'Does AI make sense for my Canvas environment?': 'canvas_ai',
+  'What does an EdStratum engagement look like?': 'engagement_shape',
+  'Run a quick AI readiness check': 'readiness_check',
+  'About EdStratum Labs': 'about_edstratum',
+  "AI strategy vs. AI implementation - what's the difference?": 'strategy_vs_implementation',
+  'Connect with the Founding leadership team': 'founding_leadership',
+}
 
 export const PHASE_LABELS: Record<ProcessingPhase, string> = {
   searching: 'Searching knowledge base',

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS messages (
   role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
   citations_json TEXT,
+  metadata_json TEXT DEFAULT '{}',
   created_at INTEGER NOT NULL,
   FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
