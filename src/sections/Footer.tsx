@@ -119,6 +119,45 @@ export default function Footer() {
           </div>
         </div>
       </div>
+
+      {/* Phone + AI advisor highlight bar */}
+      <div className="border-t border-border" aria-hidden="true" />
+      <div className="bg-surface/50">
+        <div className="section-container py-5">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center sm:text-left">
+            <div className="flex items-center gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="text-primary-light shrink-0">
+                <path d="M3 2.5a1 1 0 011-1h1.5a1 1 0 011 .8l.7 3.5a1 1 0 01-.27.93l-1.3 1.3a11 11 0 004.04 4.04l1.3-1.3a1 1 0 01.93-.27l3.5.7a1 1 0 01.8 1V13a1 1 0 01-1 1A11 11 0 013 3a1 1 0 010-.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm text-text-secondary font-medium">
+                Call our team at{' '}
+                <a
+                  href="tel:+14153012306"
+                  className="text-primary-light font-semibold hover:text-primary transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-primary rounded outline-none"
+                  aria-label="Call EdStratum Labs at 415-301-2306"
+                >
+                  415-301-2306
+                </a>
+              </span>
+            </div>
+            <span aria-hidden="true" className="hidden sm:inline text-border">|</span>
+            <span className="text-sm text-text-muted">
+              Prefer text or chat?{' '}
+              <a
+                href="#contact"
+                onClick={(e) => {
+                  e.preventDefault()
+                  window.dispatchEvent(new CustomEvent('stratum:open-chat'))
+                }}
+                className="text-primary-light font-medium hover:text-primary transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-primary rounded outline-none cursor-pointer"
+              >
+                Talk with our AI Intake Advisor
+              </a>
+              {' '}— it'll route you to the right person.
+            </span>
+          </div>
+        </div>
+      </div>
     </footer>
   )
 }
