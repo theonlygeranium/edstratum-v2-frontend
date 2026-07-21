@@ -3,13 +3,16 @@ const DEFAULT_BACKEND_URL =
   'https://stratum-backend-production-a340.up.railway.app'
 
 const frontendUrl = normalizeUrl(process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL)
+const expectedVoiceEnabled = readBool('EXPECTED_VOICE_ENABLED', false)
 const expected = {
   manifestCommit: process.env.EXPECTED_MANIFEST_COMMIT || '',
   ragEnabled: readBool('EXPECTED_RAG_ENABLED', true),
-  voiceEnabled: readBool('EXPECTED_VOICE_ENABLED', false),
+  voiceEnabled: expectedVoiceEnabled,
   persistenceEnabled: readBool('EXPECTED_PERSISTENCE_ENABLED', false),
   maxIntakeQuestions: readInt('EXPECTED_MAX_INTAKE_QUESTIONS', 7),
   analyticsEnabled: readBool('EXPECTED_ANALYTICS_ENABLED', false),
+  ttsStatus:
+    process.env.EXPECTED_TTS_STATUS || (expectedVoiceEnabled ? 'ok' : 'unconfigured'),
   embeddingProvider: process.env.EXPECTED_EMBEDDING_PROVIDER || 'hash',
   vectorStoreProvider: process.env.EXPECTED_VECTOR_STORE_PROVIDER || 'chroma',
   llmProvider: process.env.EXPECTED_LLM_PROVIDER || 'writer',
@@ -200,7 +203,11 @@ async function main() {
   expect(frontendHealthResult.response.status === 200, '/api/health returns HTTP 200')
   expect(frontendHealth.status === 'healthy', '/api/health reports healthy')
   expect(frontendHealth.rag?.status === 'ok', '/api/health reports RAG ok')
-  expect(frontendHealth.tts?.status === 'unconfigured', '/api/health reports TTS unconfigured while disabled')
+  expect(
+    frontendHealth.tts?.status === expected.ttsStatus,
+    `/api/health reports TTS ${expected.ttsStatus}`,
+    String(frontendHealth.tts?.status),
+  )
 
   if (!expected.voiceEnabled) {
     const ttsResult = await readJson('/api/tts', {
