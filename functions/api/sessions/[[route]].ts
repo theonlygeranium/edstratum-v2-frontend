@@ -13,7 +13,7 @@ interface StoredMessage {
   role: MessageRole
   content: string
   citations_json: string | null
-  metadata_json: string | null
+  metadata_json?: string | null
   created_at: number
 }
 
@@ -246,6 +246,10 @@ function messagesFromBody(body: unknown) {
   return messages.every(Boolean) ? messages as StoredMessage[] : null
 }
 
+function isMissingMetadataColumn(error: unknown) {
+  return error instanceof Error && /metadata_json|no such column/i.test(error.message)
+}
+
 function purgeOlderThanDays(body: unknown): number | null {
   if (!body || typeof body !== 'object') {
     return DEFAULT_PURGE_OLDER_THAN_DAYS
@@ -375,16 +379,28 @@ async function listMessages(request: Request, env: Env, sessionId: string) {
     return jsonResponse({ error: 'session_not_found' }, { status: 404 })
   }
 
-  const result = await env.STRATUM_DB!.prepare(
-    'SELECT id, role, content, citations_json, metadata_json, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC',
-  )
-    .bind(sessionId)
-    .all<Omit<StoredMessage, 'session_id'>>()
+  let result: D1Result<Omit<StoredMessage, 'session_id'>>
+  try {
+    result = await env.STRATUM_DB!.prepare(
+      'SELECT id, role, content, citations_json, metadata_json, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC',
+    )
+      .bind(sessionId)
+      .all<Omit<StoredMessage, 'session_id'>>()
+  } catch (error) {
+    if (!isMissingMetadataColumn(error)) {
+      throw error
+    }
+    result = await env.STRATUM_DB!.prepare(
+      'SELECT id, role, content, citations_json, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC',
+    )
+      .bind(sessionId)
+      .all<Omit<StoredMessage, 'session_id'>>()
+  }
 
   return jsonResponse({
     sessionId,
     messages: (result.results || []).map((message) => {
-      const metadata = parseJsonObject(message.metadata_json)
+      const metadata = parseJsonObject(message.metadata_json ?? null)
       return {
         id: message.id,
         role: message.role,
@@ -419,19 +435,37 @@ async function appendMessages(request: Request, env: Env, sessionId: string) {
   await touchSession(env.STRATUM_DB!, sessionId, now)
 
   for (const message of messages) {
-    await env.STRATUM_DB!.prepare(
-      'INSERT OR REPLACE INTO messages (id, session_id, role, content, citations_json, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    )
-      .bind(
-        message.id,
-        sessionId,
-        message.role,
-        message.content,
-        message.citations_json,
-        message.metadata_json,
-        message.created_at,
+    try {
+      await env.STRATUM_DB!.prepare(
+        'INSERT OR REPLACE INTO messages (id, session_id, role, content, citations_json, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run()
+        .bind(
+          message.id,
+          sessionId,
+          message.role,
+          message.content,
+          message.citations_json,
+          message.metadata_json,
+          message.created_at,
+        )
+        .run()
+    } catch (error) {
+      if (!isMissingMetadataColumn(error)) {
+        throw error
+      }
+      await env.STRATUM_DB!.prepare(
+        'INSERT OR REPLACE INTO messages (id, session_id, role, content, citations_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+        .bind(
+          message.id,
+          sessionId,
+          message.role,
+          message.content,
+          message.citations_json,
+          message.created_at,
+        )
+        .run()
+    }
   }
 
   return jsonResponse({ ok: true, count: messages.length })

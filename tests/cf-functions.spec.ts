@@ -126,6 +126,9 @@ class MemoryD1Statement {
 
   async all<T>() {
     this.db.calls.push({ query: this.query, values: this.values })
+    if (!this.db.supportsMetadataColumn && this.query.includes('metadata_json')) {
+      throw new Error('no such column: metadata_json')
+    }
     if (this.query.startsWith('SELECT id, role, content, citations_json')) {
       const sessionId = String(this.values[0])
       return {
@@ -175,7 +178,13 @@ class MemoryD1Statement {
     }
 
     if (this.query.startsWith('INSERT OR REPLACE INTO messages')) {
-      const [id, sessionId, role, content, citationsJson, metadataJson, createdAt] = this.values
+      if (!this.db.supportsMetadataColumn && this.query.includes('metadata_json')) {
+        throw new Error('no such column: metadata_json')
+      }
+      const hasMetadataColumn = this.query.includes('metadata_json')
+      const [id, sessionId, role, content, citationsJson] = this.values
+      const metadataJson = hasMetadataColumn ? this.values[5] : null
+      const createdAt = hasMetadataColumn ? this.values[6] : this.values[5]
       this.db.messages.set(String(id), {
         id: String(id),
         session_id: String(sessionId),
@@ -248,6 +257,7 @@ class MemoryD1 {
   sessions = new Map<string, SessionRow>()
   messages = new Map<string, MessageRow>()
   calls: Array<{ query: string; values: unknown[] }> = []
+  supportsMetadataColumn = true
 
   prepare(query: string) {
     return new MemoryD1Statement(this, query)
@@ -1027,6 +1037,62 @@ test('POST and GET /api/sessions/:id/messages round-trip message history', async
         source: { label: 'KB', score: 0.92, grounded: true, stale: false },
         phases: ['searching', 'retrieving', 'composing'],
         isIntakeQuestion: true,
+      },
+    ],
+  })
+})
+
+test('session message routes tolerate D1 tables without metadata_json', async () => {
+  const { db, sessionId, sessionToken } = await createPersistedSession()
+  db.supportsMetadataColumn = false
+  const headers = {
+    Authorization: `Bearer ${sessionToken}`,
+    'Content-Type': 'application/json',
+  }
+
+  const write = await sessions({
+    env: { STRATUM_DB: db, SESSION_SECRET: 'test-secret' },
+    request: new Request(`https://edstratumlabs.ai/api/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        message: {
+          id: 'assistant-legacy',
+          role: 'assistant',
+          content: 'Legacy table stores the message without metadata.',
+          timestamp: 30,
+          citations: [{ source: 'KB', excerpt: 'Evidence' }],
+          source: { label: 'KB', score: 0.92, grounded: true },
+          phases: ['searching', 'composing'],
+        },
+      }),
+    }),
+    params: { route: [sessionId, 'messages'] },
+  } as never)
+
+  expect(write.status).toBe(200)
+  expect(await write.json()).toEqual({ ok: true, count: 1 })
+
+  const read = await sessions({
+    env: { STRATUM_DB: db, SESSION_SECRET: 'test-secret' },
+    request: new Request(`https://edstratumlabs.ai/api/sessions/${sessionId}/messages`, {
+      headers,
+    }),
+    params: { route: [sessionId, 'messages'] },
+  } as never)
+
+  expect(read.status).toBe(200)
+  expect(await read.json()).toEqual({
+    sessionId,
+    messages: [
+      {
+        id: 'assistant-legacy',
+        role: 'assistant',
+        content: 'Legacy table stores the message without metadata.',
+        timestamp: 30,
+        citations: [{ source: 'KB', excerpt: 'Evidence' }],
+        phases: [],
+        isIntakeQuestion: false,
       },
     ],
   })
